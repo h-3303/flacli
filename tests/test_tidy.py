@@ -326,3 +326,23 @@ def test_album_title_variants_are_offered_and_accepted(library):
     assert summary["open_questions"]["album_title_variants"] == []
     assert summary["tag_changes"]["by_rule"]["R4 album title canonical form"]["files"] == 2
     assert summary["moves"] == 2
+
+
+def test_path_clashes_are_listed_and_settled(library):
+    make_flac(library / "Artist A" / "Album A" / "01 - One.flac", seconds=200, artist="Artist A", albumartist="Artist A",
+              album="Album A", title="One", tracknumber="1", date="2001")
+    make_flac(library / "loose copy.flac", seconds=190, artist="Artist A", albumartist="Artist A", album="Album A",
+              title="One", tracknumber="1", date="2001")
+    settle(library)
+
+    summary = Tidy(library).analyse()
+    (clash,) = summary["open_questions"]["clashes"]
+    assert clash["target"] == "Artist A/Album A/01 - One.flac"
+    assert sorted((f["path"], f["moves"]) for f in clash["files"]) == [("Artist A/Album A/01 - One.flac", False), ("loose copy.flac", True)]
+    with pytest.raises(TidyError, match="path clashes"):
+        Tidy(library).apply()
+
+    settled = Tidy(library).resolve_clashes(keep="existing")
+    assert settled["marked_for_deletion"] == ["loose copy.flac"]
+    summary = Tidy(library).analyse()
+    assert summary["open_questions"]["clashes"] == [] and [d["path"] for d in summary["deletions"]] == ["loose copy.flac"]

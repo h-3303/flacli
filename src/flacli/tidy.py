@@ -1047,6 +1047,12 @@ class Tidy:
                 "duplicate_edit_groups": len(plan["dup_edits"]),
                 "strays": plan["stray"],
                 "path_clashes": len(plan["clashes"]),
+                "clashes": [
+                    {"target": group[0].target,
+                     "files": [{"path": e.rel, "moves": e.rel != e.target, "seconds": round(getattr(e, "dur", 0) or 0, 1),
+                                "bytes": os.path.getsize(e.path)} for e in group]}
+                    for group in plan["clashes"].values()
+                ],
                 "unparseable_dates": len(notes),
             },
             "tag_changes": {"files": sum(1 for e in files if e.changes),
@@ -1149,6 +1155,39 @@ class Tidy:
                 handle.write("\n".join(lines))
 
         return {"accepted": variants, "approved_path": self.approved_path}
+
+    def resolve_clashes(self, keep="existing"):
+        """Settle every path clash (report section 6) by marking the losers for deletion in approved.py.
+        keep="existing": the file already at the target path stays, the ones that would move onto it go;
+        keep="incoming": the newcomer stays (the longest of them when several), the file in place goes.
+        Nothing in the library changes here; the next analyse carries the deletions and Apply does them."""
+        if keep not in ("existing", "incoming"):
+            raise ValueError("keep must be 'existing' or 'incoming'")
+
+        files, failed, artist_groups, album_groups, notes, plan = self.plan_everything()
+        losers = []
+
+        for group in plan["clashes"].values():
+            in_place = [e for e in group if e.rel == e.target]
+            incoming = [e for e in group if e.rel != e.target]
+
+            if keep == "existing" and in_place:
+                losers.extend(incoming)
+            else:
+                winner = max(incoming or in_place, key=lambda e: (getattr(e, "dur", 0) or 0, os.path.getsize(e.path)))
+                losers.extend(e for e in group if e is not winner)
+
+        if losers:
+            lines = ["", f"# {datetime.date.today().isoformat()} path clashes settled from tidy's section 6, keeping the "
+                         f"{'file already in place' if keep == 'existing' else 'newcomer'}",
+                     "DELETE = globals().get('DELETE', [])", "DELETE += ["]
+            lines += [f"    {e.rel!r},   # would have landed on {e.target}" for e in losers]
+            lines += ["]", ""]
+
+            with open(self.approved_path, "a", encoding="utf-8") as handle:
+                handle.write("\n".join(lines))
+
+        return {"marked_for_deletion": [e.rel for e in losers], "kept": keep, "approved_path": self.approved_path}
 
     def apply(self, force=False):
         files, failed, artist_groups, album_groups, notes, plan = self.plan_everything()

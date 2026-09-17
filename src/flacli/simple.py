@@ -489,7 +489,15 @@ async def wiki_push(artist: str | None = None, album: str | None = None) -> dict
     return await asyncio.to_thread(wiki.push, config.music_dir(), entries, wiki.target_paths(config.wiki_targets()))
 
 
-async def tidy(apply: bool = False, force: bool = False, music_dir: str | None = None, accept_album_variants: bool = False) -> dict:
+async def tidy(apply: bool = False, force: bool = False, music_dir: str | None = None, accept_album_variants: bool = False,
+               resolve_clashes: str | None = None) -> dict:
+    if resolve_clashes:
+        settled = await server.tidy_resolve_clashes(keep=resolve_clashes, music_dir=music_dir)
+        result = await server.tidy_analyse(music_dir=music_dir)
+        result["marked_for_deletion"] = settled["marked_for_deletion"]
+        result["note"] = "path clashes settled as deletions in approved.py and the plan redone; still a dry run"
+        return result
+
     if accept_album_variants:
         accepted = await server.tidy_accept_album_variants(music_dir=music_dir)
         result = await server.tidy_analyse(music_dir=music_dir)

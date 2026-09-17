@@ -1108,6 +1108,12 @@ async def tidy_analyse(music_dir: str | None = None) -> dict:
     return await asyncio.to_thread(lambda: Tidy(root).analyse())
 
 
+async def tidy_resolve_clashes(keep: str = "existing", music_dir: str | None = None) -> dict:
+    """Settle tidy's path clashes (report section 6) into approved.py deletions; analyse again after."""
+    root = Path(music_dir).expanduser() if music_dir else config.music_dir()
+    return await asyncio.to_thread(lambda: Tidy(root).resolve_clashes(keep=keep))
+
+
 async def tidy_accept_album_variants(music_dir: str | None = None) -> dict:
     """Accept tidy's suggested album-title merges (report section 1d) into approved.py; analyse again after."""
     root = Path(music_dir).expanduser() if music_dir else config.music_dir()

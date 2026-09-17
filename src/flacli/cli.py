@@ -136,6 +136,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--apply", action="store_true", help="apply the plan (tags, deletions, moves); show the plan first")
     p.add_argument("--force", action="store_true", help="apply even while files were written recently")
     p.add_argument("--new", action="store_true", help="only file newly arrived tracks; never deletes")
+    p.add_argument("--resolve-clashes", choices=["existing", "incoming"],
+                   help="settle path clashes (report section 6) as deletions in approved.py: keep the file already in place, "
+                        "or the newcomer; then plan again")
     p.add_argument("--accept-album-variants", action="store_true",
                    help="write the album-title merges the report suggests (section 1d) into approved.py, then plan again")
     p.add_argument("--paths", nargs="*", help="with --new: specific files to file")
@@ -320,7 +323,7 @@ async def dispatch(args) -> dict | str | None:
             return await simple.tidy_new(paths=args.paths or None, music_dir=args.music_dir)
 
         return await simple.tidy(apply=args.apply, force=args.force, music_dir=args.music_dir,
-                                 accept_album_variants=args.accept_album_variants)
+                                 accept_album_variants=args.accept_album_variants, resolve_clashes=args.resolve_clashes)
     if command == "wiki":
         return await _wiki(args)
     if command == "avatar":
