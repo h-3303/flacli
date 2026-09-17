@@ -402,6 +402,23 @@ async def wiki_fill(limit: int = 10) -> dict:
     return await asyncio.to_thread(wiki.fill, db(), config.music_dir(), _wiki_sources(), wiki.target_paths(config.wiki_targets()), limit)
 
 
+async def avatar_missing(include_all: bool = False) -> dict:
+    """Artists without a picture beside their music (after an incremental scan)."""
+    return await server.avatar_todo(include_all=include_all)
+
+
+async def avatar_fill(limit: int = 10, providers: str | None = None) -> dict:
+    return await server.avatar_fill(limit=limit, **({"providers": providers} if providers else {}))
+
+
+async def avatar_set(artist: str, source: str, attribution: str | None = None) -> dict:
+    return await server.avatar_set(artist=artist, source=source, attribution=attribution)
+
+
+async def avatar_push(artist: str | None = None) -> dict:
+    return await server.avatar_push(artist=artist)
+
+
 async def wiki_push(artist: str | None = None, album: str | None = None) -> dict:
     """Copy sidecar texts into the player caches again (after a cache wipe, or a new target)."""
     await server.scan_library()

@@ -42,7 +42,7 @@ TARGETS = {
     "euphonica": "~/.cache/euphonica/metadata.sqlite",
 }
 LINK_TYPES = ("wikidata", "wikipedia", "discogs", "bandcamp", "allmusic", "official homepage", "youtube", "streaming",
-              "free streaming", "lyrics", "last.fm", "purchase for download", "purchase for mail-order")
+              "free streaming", "lyrics", "last.fm", "purchase for download", "purchase for mail-order", "image")
 
 
 class WikiError(Exception):

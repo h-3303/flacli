@@ -1,6 +1,6 @@
 ---
 name: music-tidy
-description: Clean up and organise the local music library. Normalise tags, drop lossy duplicates of FLACs, remove playlist dumps, file everything as Artist/Album/NN - Title.ext, and clear download reports out of the library. New downloads are filed automatically as they land (tidy_new does it for files that arrived any other way); this skill is the full pass for everything else. Use when the user says "/music-tidy", "tidy my music", "clean up the music folder", "sort the new downloads", "organise my library", or mentions stray tracks, duplicate m4a/flac copies, or messy tags.
+description: Clean up and organise the local music library. Normalise tags, drop lossy duplicates of FLACs, remove playlist dumps, file everything as Artist/Album/NN - Title.ext, clear download reports out of the library, and give every artist a picture for the player. New downloads are filed automatically as they land (tidy_new does it for files that arrived any other way); this skill is the full pass for everything else. Use when the user says "/music-tidy", "tidy my music", "clean up the music folder", "sort the new downloads", "organise my library", "fill in the artist pictures", "the artist avatars are missing", or mentions stray tracks, duplicate m4a/flac copies, messy tags, or blank artist images.
 tags: [music, tags, library]
 ---
 
@@ -42,6 +42,27 @@ hand: with `paths` for specific files, without them after an incremental library
 indexed before counts as new; files written in the last three minutes are left to settle and listed as
 `settling`). When the user asks to "sort the new downloads", `tidy_new()` is the first thing to call;
 what it holds, plus deletions and open questions, is what this skill's full procedure is for.
+
+## Artist pictures
+
+The player (Flaclify / Euphonica) shows a picture for each artist and finds almost none by itself; once
+a lookup fails it never retries that artist. The four `avatar_*` tools give every artist one:
+
+- `avatar_todo()`: artists with no picture beside their music (`Artist/artist.jpg`; an artist with no
+  folder of their own gets `.wiki/<name>.jpg`). Say how many.
+- `avatar_fill(limit=10)`: the first provider with a picture, in order: a picture a tagger left in the
+  artist folder, the Wikidata portrait (Wikimedia Commons, author and licence recorded), a MusicBrainz
+  image relation, Deezer's public artist picture (exact name match only). The picture is saved beside
+  the music, its origin kept in `.wiki/avatars.json`, and pushed into the player's cache, replacing
+  the player's failed-lookup memo, so it shows at once. Call again while `remaining` > 0.
+  `providers="wikidata,musicbrainz"` leaves Deezer out when the user wants free-licence pictures only.
+- `avatar_set(artist, source, attribution=None)`: one picture from a file or URL the user supplied,
+  for the `not_found` ones or when they prefer another. Never invent a URL.
+- `avatar_push(artist=None)`: copy the pictures beside the music into the player again (after its
+  cache was cleared, or a picture was replaced by hand).
+
+Report the filled artists as name, source and licence, and name those still without a picture. This is
+step 6 of the procedure and is safe on its own: it writes only pictures, never tags or moves.
 
 ## Tools
 
@@ -87,6 +108,9 @@ same planner is available from a shell as `flacli tidy [--apply] [--force] [root
    Deletions are always listed individually. Then wait for a yes.
 5. **Apply** with `tidy_apply(confirm=True)`, then call `tidy_analyse` once more and confirm it reports
    zero tag changes, zero deletions, zero moves. Report what was done in numbers, plus the backup path.
+6. **Artist pictures.** `avatar_todo`, then `avatar_fill` until `remaining` is 0; ask the user for a
+   file or URL for the rest and store it with `avatar_set`. Needs no approval: nothing is deleted or
+   moved, and every picture's origin is recorded.
 
 ## Guardrails
 

@@ -155,6 +155,21 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("artist", nargs="?")
     a.add_argument("album", nargs="?")
 
+    p = commands.add_parser("avatar", help="artist pictures: beside the music as artist.jpg, pushed into the player")
+    actions = p.add_subparsers(dest="action", metavar="action")
+    actions.required = True
+    a = actions.add_parser("missing", help="artists without a picture yet (scans first)")
+    a.add_argument("--all", action="store_true", help="every artist, with picture state")
+    a = actions.add_parser("fill", help="find one per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer")
+    a.add_argument("--limit", type=int, default=10, help="artists to look up per run (default 10)")
+    a.add_argument("--providers", help="comma-separated, in order (default local,wikidata,musicbrainz,deezer)")
+    a = actions.add_parser("set", help="use one picture for an artist, from a file or a URL")
+    a.add_argument("artist")
+    a.add_argument("source", help="image file path or http(s) URL")
+    a.add_argument("--attribution", help="photographer or site, when known")
+    a = actions.add_parser("push", help="copy the pictures beside the music into the player caches again")
+    a.add_argument("artist", nargs="?")
+
     p = commands.add_parser("service", help="streaming services: status, connect, disconnect, playlists")
     p.add_argument("action", choices=["status", "connect", "disconnect", "playlists"])
     p.add_argument("name", nargs="?", choices=["tidal", "deezer", "youtube-music"])
@@ -178,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=100)
 
     p = commands.add_parser("mcp", help="run an MCP server over stdio (default: the simple one for small models)")
-    p.add_argument("--full", action="store_true", help="every fine-grained tool (47); for capable models")
+    p.add_argument("--full", action="store_true", help="every fine-grained tool (51); for capable models")
     p.add_argument("--soulseek", action="store_true", help="only the raw Nicotine+ tools")
 
     return parser
@@ -263,6 +278,15 @@ async def dispatch(args) -> dict | str | None:
         return await simple.tidy(apply=args.apply, force=args.force, music_dir=args.music_dir)
     if command == "wiki":
         return await _wiki(args)
+    if command == "avatar":
+        if args.action == "missing":
+            return await simple.avatar_missing(include_all=args.all)
+        if args.action == "fill":
+            return await simple.avatar_fill(limit=args.limit, providers=args.providers)
+        if args.action == "set":
+            return await simple.avatar_set(args.artist, args.source, attribution=args.attribution)
+
+        return await simple.avatar_push(args.artist)
     if command == "service":
         headers_raw = None
 

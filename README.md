@@ -14,7 +14,7 @@ The same engine now has three front doors, so the tool works with whatever drive
 | --- | --- | --- |
 | **CLI** | `flacli get "Lorde - Royals"` | any agent with a shell, including small local models; humans |
 | **Simple MCP** | `flacli mcp` | MCP clients with a modest model: fifteen coarse tools, one step each |
-| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (47) |
+| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (51) |
 
 Every CLI command prints one JSON object and returns within seconds; Soulseek matching runs in a detached worker
 and `flacli status` follows it. `flacli guide` prints the workflow for an agent to read.
@@ -62,12 +62,22 @@ flacli review 2 --doubtful            # the matches below 0.85, with reasons
 flacli approve 2 --tracks 14,15 && flacli skip 2 --tracks 16
 flacli m3u 2
 flacli tidy && flacli tidy --apply    # library clean-up: plan, then apply
+flacli avatar fill                    # a picture for every artist: Wikidata portrait, MusicBrainz, Deezer
 flacli wiki missing                   # artists and albums whose bio / wiki in the player is empty
 flacli wiki fill                      # Wikipedia's lead paragraph where an article exists, attributed
 flacli wiki set "Artist" "Album" --text-file t.txt --attribution "Written by ... from MusicBrainz"
 ```
 
 `flacli --help` and `flacli <command> --help` document every flag.
+
+### Artist pictures
+
+The player shows a picture for each artist and finds almost none on its own. `flacli avatar fill` gives every
+artist one: a picture a tagger left in the artist folder, else the Wikidata portrait (Wikimedia Commons, author
+and licence recorded), else a MusicBrainz image relation, else Deezer's public artist picture for an exact name
+match. It is saved beside the music as `Artist/artist.jpg`, where Navidrome and Jellyfin look too, its origin in
+`.wiki/avatars.json`, and written into the player's image cache the way the player would have, so it shows at
+once. `flacli avatar set "Artist" photo.jpg` uses a picture of your own.
 
 ### Bios and wikis
 

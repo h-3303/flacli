@@ -46,10 +46,10 @@ src/flacli/
                     server._request_job (request: match, auto-approve >= min_confidence, queue).
                     PREF_FIELDS is the serialisable subset of MatchPrefs; prefs_to()/prefs_from() are
                     the only way prefs cross the process boundary. SIGTERM/SIGINT cancel the task.
-  server.py         The FULL MCP server (name "flacli", 34 tools) — the original claude-music library
-                    server, tool names unchanged, plus the four wiki_* tools. State{db, bridge, jobs, mb_fetch, mb_sleep} is the
-                    process-wide context that simple.py and worker.py also use; tests inject
-                    mb_fetch/mb_sleep. In-process background jobs live in State.jobs (asyncio tasks)
+  server.py         The FULL MCP server (name "flacli", 38 tools) — the original claude-music library
+                    server, tool names unchanged, plus the four wiki_* and four avatar_* tools.
+                    State{db, bridge, jobs, mb_fetch, mb_sleep, fetch_bytes} is the process-wide context
+                    that simple.py and worker.py also use; tests inject mb_fetch/mb_sleep/fetch_bytes. In-process background jobs live in State.jobs (asyncio tasks)
                     when a job is started through this server; the CLI/simple server use workers
                     instead. Both write the same jobs table, so `flacli status` sees either.
   soulseek_mcp.py   The raw Nicotine+ MCP server (name "soulseek", 13 tools): search, browse, download,
@@ -66,6 +66,13 @@ src/flacli/
                     (albums keyed by mbid, else title+albumartist — an album with neither is skipped;
                     artists by mbid, else name), rewriting the BSON document with only wiki/bio changed.
                     Never creates the player's database. WikiError is in every error list.
+  avatar.py         Artist pictures. missing()/fill()/set_image()/push() over wiki.inventory()'s artists.
+                    The picture is a sidecar next to artist.md (<Artist>/artist.jpg|png|webp, loose ones
+                    in .wiki/<name>.ext); origins in <music>/.wiki/avatars.json. PictureSources: Wikidata
+                    P18 → Commons imageinfo (1200 px rendition, author, licence), MusicBrainz "image"
+                    relations to Commons, Deezer public search (exact name, never its "/artist//"
+                    placeholder), through wiki.Sources' cached JSON fetch; bytes via fetch_bytes.
+                    push_avatar() writes into the player's cache itself (see couplings). Pillow.
   bsonlite.py       Minimal BSON codec for those documents (serde subset; raises on unknown types).
   GUIDE.md          The agent guide (`flacli guide`). Written for the smallest model that might follow
                     it. Keep the "## Quick reference" heading: --short prints from it to the next "## ".
@@ -117,8 +124,10 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     test_mcp_server.py (soulseek + full servers over stdio), test_e2e_pipeline.py
                     (the original pipeline), test_requests.py, test_tidy.py, test_connectors.py
                     (recorded fixtures), test_wiki.py (BSON codec, sidecars, sources through a fake
-                    web, push into a Flaclify-shaped sqlite), test_claude_plugin.py (manifests validate
-                    strictly when `claude` is installed). 170 tests, ~65 s.
+                    web, push into a Flaclify-shaped sqlite), test_avatar.py (picture sources through
+                    the same fake, sidecars, ledger, renditions into a cache with an images table),
+                    test_claude_plugin.py (manifests validate strictly when `claude` is installed).
+                    176 tests, ~60 s.
 ```
 
 ## Cross-file couplings (each fails quietly)
@@ -141,13 +150,21 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
 - `GUIDE.md` ↔ `cli.py` commands and flags. The guide is what an agent reads; a flag renamed in
   argparse and not in the guide is a flag the agent will get wrong.
 - `mcp_simple.py` tool list ↔ `tests/test_worker_e2e.py::test_simple_mcp_server_tool_list` (exact set)
-  ↔ the site's "fifteen coarse tools" and README; the full server's count (47 with soulseek) is in
+  ↔ the site's "fifteen coarse tools" and README; the full server's count (51 with soulseek) is in
   cli.py's `--full` help, mcp_simple.py's docstring, README and the site.
 - `wiki.push_entry` ↔ Flaclify's `cache/sqlite.rs` (tables albums/artists, BSON `AlbumMeta` /
   `ArtistMeta` from `meta_providers/models.rs`, keys: album mbid else title+albumartist, artist mbid
   else name; `last_modified` RFC 3339). Serde needs every non-Option field present, so a new
   document must carry name/tags/image (+ similar/artist_type for artists). Flaclify's three-way
   timestamp compare shows our row as "local, newer than MPD" and offers its own sync button.
+- `avatar.push_avatar` ↔ Flaclify's `utils.rs` save_and_register_image / `cache/sqlite.rs` images table:
+  key `avatar:<artist name>` (the name as the player splits it: our albumartist), rows for is_thumbnail
+  0 and 1, filename `<uuid hex>.webp` under `<cache>/images/`, hires shrunk (never enlarged) to
+  `max-image-resolution`, thumbnail short edge = `thumbnail-image-size`, WebP q90 unless
+  `store-lossless-images` (read with `gsettings get`, schema defaults 1024/128/false otherwise). An
+  empty filename is the player's failed-lookup memo; the push replaces it. Cache dir = metadata.sqlite's
+  folder (`~/.cache/flaclify`, `~/.cache/euphonica`).
+- `wiki.LINK_TYPES` includes "image" so avatar.py sees MusicBrainz image relations; the wiki tools show it too.
 - `MIGRATIONS` length ↔ `schema_version` assertions in test_library_db_mb.py and test_mcp_server.py.
 - `site/index.html` ld+json `softwareVersion` and the test count in the black band ↔ reality. Reshoot
   `og.png` when the top of the page changes; the portfolio plate

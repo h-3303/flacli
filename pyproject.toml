@@ -1,6 +1,6 @@
 [project]
 name = "flacli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Playlist sync and library tidying from the shell or over MCP: MusicBrainz canonicalisation, local library diff, Soulseek fetching through your own Nicotine+. Works with any agent that can run a command."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,6 +9,7 @@ keywords = ["music", "soulseek", "nicotine-plus", "playlists", "musicbrainz", "f
 dependencies = [
     "mcp>=2.2,<3",
     "mutagen>=1.47",
+    "pillow>=10",
     "ytmusicapi>=1.8",
 ]
 

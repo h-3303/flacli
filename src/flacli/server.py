@@ -34,6 +34,7 @@ from .musicbrainz import MusicBrainzClient, MusicBrainzError
 from .requester import expand, parse_items
 from .tidy import Tidy, TidyError
 from .troi_resolver import Troi, TroiError
+from . import avatar as _avatar
 from . import wiki as _wiki
 from .wiki import WikiError
 
@@ -74,6 +75,7 @@ class State:
     jobs: dict[int, asyncio.Task] = {}
     mb_fetch = None      # tests inject a fake fetcher
     mb_sleep = None
+    fetch_bytes = None   # tests inject a fake picture download
 
 
 def db() -> Database:
@@ -537,6 +539,10 @@ def _wiki_targets():
     return _wiki.target_paths(config.wiki_targets())
 
 
+def _pictures() -> _avatar.PictureSources:
+    return _avatar.PictureSources(_wiki_sources(), fetch_bytes=State.fetch_bytes)
+
+
 @mcp.tool(annotations=WRITE_LOCAL)
 @tool_errors
 async def wiki_todo(include_all: bool = False) -> dict:
@@ -928,6 +934,52 @@ async def write_m3u(playlist_id: int, path: str | None = None, relative_to: str 
     result["missing_count"] = len(result["missing"])
     result["missing"] = result["missing"][:50]
     return result
+
+
+# Artist pictures #
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def avatar_todo(include_all: bool = False) -> dict:
+    """Artists in the library with no picture beside their music (<Artist>/artist.jpg), which is what the player
+    shows as the artist's avatar. Runs an incremental scan first. Then avatar_fill; give the rest one with avatar_set."""
+    await scan_library()
+    return await asyncio.to_thread(_avatar.missing, db(), config.music_dir(), include_all)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def avatar_fill(limit: int = 10, providers: str = "local,wikidata,musicbrainz,deezer") -> dict:
+    """Find a picture for every artist without one, `limit` artists per call, from the first provider that has one:
+    a picture a tagger left in the artist folder, the artist's Wikidata portrait (Wikimedia Commons, with author
+    and licence), a MusicBrainz image relation, then Deezer's public artist picture (exact name match only). The
+    picture is saved beside the music, its origin in <music>/.wiki/avatars.json, and pushed into the player's
+    cache so it shows at once. `not_found` artists need one from the user: avatar_set. Call again while
+    `remaining` > 0. providers narrows or reorders the sources (e.g. "wikidata,musicbrainz" to leave Deezer out)."""
+    await scan_library()
+    return await asyncio.to_thread(_avatar.fill, db(), config.music_dir(), _pictures(), _wiki_targets(), limit, providers)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def avatar_set(artist: str, source: str, attribution: str | None = None) -> dict:
+    """Use one picture for an artist: `source` is a local image file or an http(s) URL (jpg, png or webp, at least
+    200 px on the short edge). Saved beside the music, replacing any previous picture, and pushed into the player.
+    attribution names the photographer or site when known."""
+    await scan_library()
+    return await asyncio.to_thread(_avatar.set_image, db(), config.music_dir(), artist, source, _pictures(), _wiki_targets(),
+                                   attribution)
+
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def avatar_push(artist: str | None = None) -> dict:
+    """Copy the pictures beside the music into the players' caches again (one artist, or every artist with a
+    picture), e.g. after the player's cache was cleared or a picture was replaced by hand."""
+    await scan_library()
+    albums, artists = await asyncio.to_thread(_wiki.inventory, db(), config.music_dir())
+    entries = [_wiki.find_entry(albums, artists, artist)] if artist else artists
+    return await asyncio.to_thread(_avatar.push, config.music_dir(), entries, _wiki_targets())
 
 
 # Tidy #

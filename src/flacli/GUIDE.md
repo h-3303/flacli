@@ -23,6 +23,9 @@ flacli queue <id>                     totals of what would download; show them t
 flacli queue <id> --yes               queue it (only after the user said yes)
 flacli m3u <id>                       write the playlist file; lists what is still missing
 flacli tidy [--apply]                 library clean-up plan; apply only after the user saw the deletions
+flacli avatar missing                 artists with no picture yet (the player shows it as the artist's avatar)
+flacli avatar fill                    a picture per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer
+flacli avatar set "Artist" <file|url> use this picture instead (when fill found none, or the user prefers one)
 flacli search "query"                 raw Soulseek search when the matcher found nothing
 flacli wiki missing                   artists and albums with no bio / wiki text yet
 flacli wiki fill                      Wikipedia text where an article exists; briefs with facts for the rest
@@ -78,6 +81,21 @@ when and where it came out, who made it, what it sounds like if a source says so
 they are and where from, then what they have made. Release level, not track by track. State facts; no
 praise, no "iconic", no "seminal". The attribution is shown under the text: name the sources, and yourself
 if you wrote it.
+
+## Workflow: artist pictures (part of tidying)
+
+The player shows a picture for each artist and finds almost none by itself. `flacli avatar` gives it one:
+saved beside the music as `Artist/artist.jpg`, its origin in `.wiki/avatars.json`, pushed into the player's
+cache so it shows at once.
+
+1. `flacli avatar missing` lists artists without a picture. Say how many.
+2. `flacli avatar fill` takes them ten at a time: a picture a tagger left in the artist folder, else the
+   Wikidata portrait (Wikimedia Commons, author and licence recorded), else a MusicBrainz image relation,
+   else Deezer's public artist picture (exact name match only). Run again while `remaining` > 0.
+   `--providers wikidata,musicbrainz` leaves Deezer out when the user prefers free-licence pictures only.
+3. `not_found` artists need a picture from the user: a file or a URL, then
+   `flacli avatar set "Artist" <file|url> --attribution "..."`. Never invent a URL.
+4. Report the `filled` list as artist, source and licence; name the ones still without a picture.
 
 ## Rules
 
