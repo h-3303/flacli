@@ -23,6 +23,7 @@ SETTINGS = {
     "auto_tidy": ("FLACLI_AUTO_TIDY", True, bool),
     "wiki_targets": ("FLACLI_WIKI_TARGETS", "flaclify", str),
     "mpd": ("FLACLI_MPD", "", str),
+    "stall_minutes": ("FLACLI_STALL_MINUTES", "30", str),
 }
 
 DESCRIPTIONS = {
@@ -39,6 +40,8 @@ DESCRIPTIONS = {
                     "(default: flaclify)",
     "mpd": "The player's MPD, told about new files and saved playlists: empty = auto ($MPD_HOST, the usual local sockets, "
            "localhost:6600), off, a socket path, or [password@]host[:port]",
+    "stall_minutes": "Give up on a queued transfer whose place in the user's queue has not moved for this long and ask the "
+                     "next candidate instead; 0 or off never gives up (default 30)",
 }
 
 
@@ -191,6 +194,19 @@ def tidal_client_id() -> str:
 def tidal_redirect_uri() -> str:
     """Loopback redirect for the TIDAL PKCE flow; must be registered verbatim on the TIDAL app."""
     return get("tidal_redirect_uri") or "http://127.0.0.1:43117/callback"
+
+
+def stall_minutes() -> float:
+    """Minutes a queued transfer may sit at the same queue position before the next candidate is asked; 0 = never."""
+    raw = get("stall_minutes").lower()
+
+    if raw in ("", "off", "no", "false", "never"):
+        return 0.0
+
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 30.0
 
 
 def auto_tidy() -> bool:

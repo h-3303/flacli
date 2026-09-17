@@ -272,7 +272,7 @@ def test_sources_command_and_index_migration(home):
     assert code == 0 and result["mbid"] == "art-ton" and result["wikipedia"] is None and result["musicbrainz"]["type"] == "Group"
 
     db = Database(config.db_path())
-    assert db.schema_version == 2
+    assert db.schema_version == 3
     row = db.conn.execute("SELECT albumartist, mb_artist_id FROM library_files WHERE path LIKE '%Lovefool%'").fetchone()
     assert tuple(row) == ("The Cardigans", "art-card")
     db.close()

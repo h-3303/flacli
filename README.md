@@ -48,7 +48,7 @@ flacli config set contact you@example.com     # sent in the MusicBrainz User-Age
 
 Settings live in `~/.config/flacli/config.toml`; environment variables (`FLACLI_MUSIC_DIR`, `FLACLI_DATA`,
 `FLACLI_CONTACT`, `NICOTINE_MCP_SOCKET`, `FLACLI_TIDAL_CLIENT_ID`, `FLACLI_AUTO_TIDY`, `FLACLI_WIKI_TARGETS`,
-`FLACLI_MPD`) override them.
+`FLACLI_MPD`, `FLACLI_STALL_MINUTES`) override them.
 
 ## Use from a shell
 

@@ -14,7 +14,7 @@
 
 Requires Nicotine+ 3.3 or newer and uv. The script copies the MCP Bridge plugin into Nicotine+'s plugin folder (native or Flatpak) and runs `uv tool install .` so `flacli` lands on PATH. Then tick "MCP Bridge" in Nicotine+ → Preferences → Plugins and run `flacli doctor`.
 
-Settings: `~/.config/flacli/config.toml` (`flacli config set music_dir ~/Music`), overridden by FLACLI_MUSIC_DIR, FLACLI_DATA, FLACLI_CONTACT, NICOTINE_MCP_SOCKET, FLACLI_TIDAL_CLIENT_ID, FLACLI_AUTO_TIDY, FLACLI_WIKI_TARGETS, FLACLI_MPD.
+Settings: `~/.config/flacli/config.toml` (`flacli config set music_dir ~/Music`), overridden by FLACLI_MUSIC_DIR, FLACLI_DATA, FLACLI_CONTACT, NICOTINE_MCP_SOCKET, FLACLI_TIDAL_CLIENT_ID, FLACLI_AUTO_TIDY, FLACLI_WIKI_TARGETS, FLACLI_MPD, FLACLI_STALL_MINUTES.
 
 ## Agent guide
 

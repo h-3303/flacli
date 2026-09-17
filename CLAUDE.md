@@ -103,8 +103,9 @@ src/flacli/
                     it. Keep the "## Quick reference" heading: --short prints from it to the next "## ".
   bridge.py         Async client for the bridge socket (protocol v1/v2). BridgeUnavailable / RateLimited.
   db.py             SQLite (WAL, check_same_thread=False): playlists, tracks, matches, jobs, library
-                    index, cache, user penalties. schema_version 2 (2 added albumartist +
-                    mb_artist_id to library_files and reset mtime so the next scan re-reads tags).
+                    index, cache, user penalties. schema_version 3 (2 added albumartist +
+                    mb_artist_id to library_files and reset mtime so the next scan re-reads tags; 3 added
+                    queue_position + stalled_since to matches for the stall check in sync_downloads).
   matcher.py        MatchPrefs, MatchJob (searches through the bridge, scores results, album pass),
                     scoring functions. Honours the bridge's rate limit by waiting, never by retrying.
   requester.py      parse_items()/expand(): "Artist - Title", "Artist - Album (album)", dicts ->
@@ -153,7 +154,7 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     the same fake, sidecars, ledger, renditions into a cache with an images table), test_cover.py
                     (Cover Art Archive / Deezer / iTunes through the fakes, cover files, embedding, folder-keyed push),
                     test_claude_plugin.py (manifests validate strictly when `claude` is installed).
-                    198 tests, ~60 s.
+                    199 tests, ~60 s.
 ```
 
 ## Cross-file couplings (each fails quietly)

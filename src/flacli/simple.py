@@ -276,7 +276,7 @@ async def status(playlist_id: int | None = None) -> dict:
     if queued:
         try:
             synced = await server.sync_downloads(playlist_id)
-            result["downloads"] = {k: synced[k] for k in ("checked", "done", "downloading", "queued", "failed", "retried", "missing")}
+            result["downloads"] = {k: synced[k] for k in ("checked", "done", "downloading", "queued", "failed", "retried", "stalled", "missing")}
 
             if synced.get("tidied"):
                 result["tidied"] = synced["tidied"]

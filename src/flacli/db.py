@@ -101,6 +101,11 @@ MIGRATIONS = [
     ALTER TABLE library_files ADD COLUMN mb_artist_id TEXT;
     UPDATE library_files SET mtime = -1;
     """,
+    # 3: stall detection for queued transfers: the queue position last seen and since when it has not moved
+    """
+    ALTER TABLE matches ADD COLUMN queue_position INTEGER;
+    ALTER TABLE matches ADD COLUMN stalled_since TEXT;
+    """,
 ]
 
 
@@ -311,8 +316,23 @@ class Database:
         if bump_attempts:
             sets.append("attempts = attempts + 1")
 
+        if download_id is not ...:   # a new transfer: its stall clock starts afresh
+            sets.append("queue_position = NULL")
+            sets.append("stalled_since = NULL")
+
         params.append(track_id)
         self.conn.execute(f"UPDATE matches SET {', '.join(sets)} WHERE track_id = ?", params)
+
+    def note_queue_position(self, track_id, position, now=None) -> str:
+        """Record the transfer's queue position; returns since when it has been at that position (ISO)."""
+        row = self.conn.execute("SELECT queue_position, stalled_since FROM matches WHERE track_id = ?", (track_id,)).fetchone()
+
+        if row["stalled_since"] and row["queue_position"] == position:
+            return row["stalled_since"]
+
+        since = now or datetime.now(timezone.utc).isoformat()   # full precision: the stall limit may be small
+        self.conn.execute("UPDATE matches SET queue_position = ?, stalled_since = ? WHERE track_id = ?", (position, since, track_id))
+        return since
 
     @staticmethod
     def candidates(row) -> list[dict]:

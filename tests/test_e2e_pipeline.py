@@ -367,6 +367,41 @@ async def test_folder_candidate_is_a_fallback_for_its_assigned_file(library_serv
     assert server.db().candidates(server.db().track(row["id"]))[0]["kind"] == "folder"
 
 
+async def test_stalled_queue_moves_to_the_next_candidate(library_server, monkeypatch):
+    """A transfer whose queue position has not moved for stall_minutes is given up on, without penalising the user;
+    a position that moves resets the clock."""
+    server, harness, music, fake_mb, peers = library_server
+    monkeypatch.setenv("FLACLI_STALL_MINUTES", "0.001")   # 60 ms
+    (playlist,) = (await server.import_playlist_file(str(FIXTURES / "exportify.csv")))["imported"]
+    playlist_id = playlist["playlist_id"]
+    await server.resolve_playlist(playlist_id)
+    await server.match_playlist(playlist_id, album_mode="off", harvest_seconds=0.3)
+    await asyncio.wait_for(server.State.jobs[playlist_id], timeout=60)
+    lonely = await _queue_lonely(server, playlist_id)
+    (transfer,) = harness.transfers()
+
+    def position(n):
+        def apply():
+            transfer.status = "Queued"
+            transfer.queue_position = n
+        harness.on_main(apply)
+
+    position(5)
+    synced = await server.sync_downloads(playlist_id)
+    assert synced["queued"] == 1 and synced["stalled"] == 0, "the clock has only just started"
+    await asyncio.sleep(0.15)
+    position(4)
+    synced = await server.sync_downloads(playlist_id)
+    assert synced["queued"] == 1 and synced["stalled"] == 0, "the queue moved, so the clock restarted"
+    await asyncio.sleep(0.15)
+    synced = await server.sync_downloads(playlist_id)
+    assert synced["stalled"] == 1 and synced["queued"] == 0
+    assert [t.username for t in harness.transfers()] == ["peerC-mp3"]
+    row = server.db().track(lonely["track_id"])
+    assert row["status"] == "queued" and row["last_error"] == "stalled at peerC-flac for 0 min (queue position 4)"
+    assert server.db().user_failures(_last_job_id(server)) == {}, "a slow queue is not the user's failure"
+
+
 async def test_rate_limit_wait_is_visible(library_server):
     server, harness, music, fake_mb, peers = library_server
     harness.set_plugin_setting("search_rate_limit", 1)

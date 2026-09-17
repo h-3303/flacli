@@ -229,7 +229,7 @@ async def test_library_server_over_stdio(bridge, tmp_path):
 
         status = payload(await session.call_tool("library_status", {}))
         assert status["bridge"]["reachable"] is True and status["bridge"]["protocol"] == 2
-        assert status["schema_version"] == 2 and status["data_dir"] == str(tmp_path / "data")
+        assert status["schema_version"] == 3 and status["data_dir"] == str(tmp_path / "data")
 
         imported = payload(await session.call_tool("import_playlist_file", {
             "path": str(Path(__file__).parent / "fixtures" / "exportify.csv"),

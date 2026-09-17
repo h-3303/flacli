@@ -11,6 +11,8 @@ import functools
 import os
 import time
 
+from datetime import datetime
+
 from pathlib import Path
 from typing import Literal
 
@@ -53,6 +55,9 @@ LIVE_TRANSFER_STATUSES = {"Queued", "Getting status", "Transferring", "Paused", 
 # as failed, so the user is penalised to the skip threshold at once instead of one failure per file.
 STALE_SHARE_REASONS = {"File not shared.", "Banned", "Disallowed extension"}
 USER_SKIP_FAILURES = 2
+# Statuses under which a transfer waits on the peer; a queue position that does not move for `stall_minutes`
+# means the peer is not uploading and the next candidate is asked instead.
+WAITING_TRANSFER_STATUSES = {"Queued", "Getting status"}
 
 mcp = MCPServer(
     name="flacli",
@@ -886,14 +891,15 @@ def _candidate_path(candidate) -> str | None:
     return candidate["path"] if candidate["kind"] == "file" else candidate.get("expected_path")
 
 
-async def _next_candidate(row, failed_user, job_failures, preferred_users=()):
+async def _next_candidate(row, failed_user, job_failures, preferred_users=(), reason=None, want_free_slot=False):
     """Queue the track from its next usable candidate, a single file either way (a folder candidate contributes the
     one file assigned to this track). Users at the skip threshold are passed over; among the rest, a user already
-    serving another track of this playlist comes first so an album stays together where it can."""
+    serving another track of this playlist comes first so an album stays together where it can, and with
+    want_free_slot one who reported a free upload slot comes before one who did not."""
     candidates = db().candidates(row)
     remaining = [c for c in candidates[1:]
                  if _candidate_path(c) and job_failures.get(c["user"], 0) < USER_SKIP_FAILURES and c["user"] != failed_user]
-    remaining.sort(key=lambda c: c["user"] not in preferred_users)
+    remaining.sort(key=lambda c: (c["user"] not in preferred_users, want_free_slot and not c.get("free_slot")))
 
     if not remaining or row["attempts"] >= MatchPrefs.max_attempts:
         return None
@@ -904,9 +910,20 @@ async def _next_candidate(row, failed_user, job_failures, preferred_users=()):
                                  size=(chosen.get("size") or 0) if chosen["kind"] == "file" else 0, attrs=attrs)
     reordered = [chosen] + [c for c in candidates if c is not chosen]
     db().set_match(row["id"], "queued", candidates=reordered, confidence=chosen["confidence"],
-                   download_id=result["queued"][0]["download_id"], last_error=f"retry after {failed_user} failed",
+                   download_id=result["queued"][0]["download_id"], last_error=reason or f"retry after {failed_user} failed",
                    bump_attempts=True)
     return chosen
+
+
+def _stalled_for(row, transfer) -> float | None:
+    """Minutes the transfer has sat at its current queue position, or None while the stall check is off."""
+    limit = config.stall_minutes()
+
+    if not limit:
+        return None
+
+    since = db().note_queue_position(row["id"], transfer.get("queue_position"))
+    return (time.time() - datetime.fromisoformat(since).timestamp()) / 60
 
 
 @mcp.tool(annotations=NETWORK)
@@ -916,7 +933,9 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
     A transfer at any status Nicotine+ would not move on its own (a peer's refusal such as "File not shared.",
     a dropped connection, a cancel) has failed. With retry, it is re-queued from the next candidate, single file
     or the track's file inside a folder candidate, and the replaced transfer is cleared from Nicotine+. A user
-    who failed twice, or once with a stale share ("File not shared.", "Banned"), is skipped for the job."""
+    who failed twice, or once with a stale share ("File not shared.", "Banned"), is skipped for the job. A transfer
+    queued at the same position for longer than the `stall_minutes` setting (default 30) is given up on the same
+    way, preferring a candidate with a free slot; the user is not penalised."""
     db().get_playlist(playlist_id)
     rows = db().tracks(playlist_id, statuses=["queued", "downloading"])
 
@@ -928,7 +947,7 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
     job = db().conn.execute("SELECT id FROM jobs WHERE playlist_id = ? ORDER BY id DESC LIMIT 1", (playlist_id,)).fetchone()
     job_id = job["id"] if job else None
     failures = db().user_failures(job_id) if job_id else {}
-    changes = {"done": 0, "downloading": 0, "queued": 0, "failed": 0, "retried": 0, "missing": 0}
+    changes = {"done": 0, "downloading": 0, "queued": 0, "failed": 0, "retried": 0, "stalled": 0, "missing": 0}
     finished: list[str] = []
     replaced: list[str] = []
     serving = {by_id[r["download_id"]]["user"] for r in rows
@@ -970,8 +989,24 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
                 replaced.append(row["download_id"])
                 changes["retried"] += 1
         else:
-            db().set_match(row["id"], "queued")
-            changes["queued"] += 1
+            stalled = _stalled_for(row, transfer) if status in WAITING_TRANSFER_STATUSES and retry else None
+            limit = config.stall_minutes()
+            replacement = None
+
+            if stalled is not None and stalled >= limit:
+                user = transfer["user"]
+                position = transfer.get("queue_position")
+                reason = f"stalled at {user} for {stalled:.0f} min" + (f" (queue position {position})" if position else "")
+                replacement = await _next_candidate(row, user, failures, serving, reason=reason, want_free_slot=True)
+
+            if replacement is None:
+                db().set_match(row["id"], "queued")
+                changes["queued"] += 1
+            else:
+                serving.discard(transfer["user"])
+                serving.add(replacement["user"])
+                replaced.append(row["download_id"])
+                changes["stalled"] += 1
 
     if replaced:
         try:
