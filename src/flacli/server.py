@@ -1108,6 +1108,12 @@ async def tidy_analyse(music_dir: str | None = None) -> dict:
     return await asyncio.to_thread(lambda: Tidy(root).analyse())
 
 
+async def tidy_accept_album_variants(music_dir: str | None = None) -> dict:
+    """Accept tidy's suggested album-title merges (report section 1d) into approved.py; analyse again after."""
+    root = Path(music_dir).expanduser() if music_dir else config.music_dir()
+    return await asyncio.to_thread(lambda: Tidy(root).accept_album_variants())
+
+
 @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=False))
 @tool_errors
 async def tidy_apply(music_dir: str | None = None, confirm: bool = False, force: bool = False) -> dict:

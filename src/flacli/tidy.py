@@ -355,6 +355,52 @@ def first(entry, field):
     return entry.new[field][0] if entry.new[field] else ""
 
 
+DISC_RE = re.compile(r"\s*[\(\[]?\s*(?:disc|disk|cd)\s*\d+\s*[\)\]]?\s*$", re.IGNORECASE)
+TITLE_SPLIT_RE = re.compile(r"\s+[-–—]\s+|:\s+|\s+/\s+")
+
+
+def album_variants(files):
+    """Album titles that read as a variant of another album by the same album artist: a box-set disc
+    named 'Set - Album', 'Album (Disc 2)', 'Album: Bonus'. One suggestion per variant, ready to become
+    an ALBUM_CANON line; the album with more files is the canonical one."""
+    albums = collections.defaultdict(dict)   # artist key -> album key -> {"title", "artist", "files"}
+
+    for entry in files:
+        album = first(entry, "ALBUM")
+        artist = first(entry, "ALBUMARTIST") or primary_artist(first(entry, "ARTIST"))
+
+        if not album or not artist or akey(artist) == akey(VARIOUS):
+            continue
+
+        slot = albums[akey(artist)].setdefault(album_key(album), {"title": album, "artist": artist, "files": 0})
+        slot["files"] += 1
+
+    found = []
+
+    for titles in albums.values():
+        if len(titles) < 2:
+            continue
+
+        for key, info in titles.items():
+            title = info["title"]
+            parts = {album_key(p) for p in TITLE_SPLIT_RE.split(title) if p.strip()}
+            parts.add(album_key(DISC_RE.sub("", title)))
+            parts.discard(key)
+            targets = [t for k, t in titles.items() if k in parts]
+
+            if targets:
+                target = max(targets, key=lambda t: t["files"])
+                found.append({"artist": info["artist"], "variant": title, "canonical": target["title"],
+                              "files": info["files"], "canonical_files": target["files"]})
+
+    return sorted(found, key=lambda v: (v["artist"].casefold(), v["variant"].casefold()))
+
+
+def album_variant_lines(variants):
+    """The ALBUM_CANON entries for the report and for approved.py."""
+    return [f"    {v['variant'].casefold()!r}: {v['canonical']!r},   # {v['artist']}, {v['files']} file(s)" for v in variants]
+
+
 class Entry:
     """One audio file: original tags (f), planned tags (new), the changes between them, and its target path."""
 
@@ -822,6 +868,14 @@ class Tidy:
                 if rule.startswith("R2b"):
                     P(f"  {field:6s} {old} -> {new}   ({entry.rel})")
 
+        P("\n## 1d. Album titles that read as a variant of another album by the same artist: needs an ALBUM_CANON decision")
+        variants = album_variants(files)
+
+        for line in album_variant_lines(variants):
+            P(line)
+
+        P(f"  -> {len(variants)} suggested   (paste into ALBUM_CANON, or `flacli tidy --accept-album-variants`)")
+
         P("\n## 2. Split albums (same folder + album identity, differing fields in the ORIGINAL tags)")
         count = 0
 
@@ -987,6 +1041,7 @@ class Tidy:
             "recent_files": plan["recent"],
             "open_questions": {
                 "artist_spelling_variants": artist_variants,
+                "album_title_variants": album_variants(files),
                 "missing_album": len(missing_album),
                 "various_artists_groups": various,
                 "duplicate_edit_groups": len(plan["dup_edits"]),
@@ -1071,6 +1126,29 @@ class Tidy:
     def _append_log(self, header, log_lines):
         with open(self.log_path, "a", encoding="utf-8") as handle:
             handle.write(f"# {header}\n" + "".join(line + "\n" for line in log_lines))
+
+    def accept_album_variants(self):
+        """Append every suggested album-title merge (report section 1d) to approved.py as ALBUM_CANON entries.
+        The next analyse turns them into R4 tag changes and moves; nothing in the library changes here."""
+        files, failed, artist_groups, album_groups, notes, plan = self.plan_everything()
+        variants = album_variants(files)
+
+        if variants:
+            lines = [
+                "",
+                f"# {datetime.date.today().isoformat()} album titles that read as a variant of another album by the same artist "
+                "(accepted from tidy's section 1d)",
+                "ALBUM_CANON = globals().get('ALBUM_CANON', {})",
+                "ALBUM_CANON.update({",
+                *album_variant_lines(variants),
+                "})",
+                "",
+            ]
+
+            with open(self.approved_path, "a", encoding="utf-8") as handle:
+                handle.write("\n".join(lines))
+
+        return {"accepted": variants, "approved_path": self.approved_path}
 
     def apply(self, force=False):
         files, failed, artist_groups, album_groups, notes, plan = self.plan_everything()

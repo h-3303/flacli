@@ -489,7 +489,14 @@ async def wiki_push(artist: str | None = None, album: str | None = None) -> dict
     return await asyncio.to_thread(wiki.push, config.music_dir(), entries, wiki.target_paths(config.wiki_targets()))
 
 
-async def tidy(apply: bool = False, force: bool = False, music_dir: str | None = None) -> dict:
+async def tidy(apply: bool = False, force: bool = False, music_dir: str | None = None, accept_album_variants: bool = False) -> dict:
+    if accept_album_variants:
+        accepted = await server.tidy_accept_album_variants(music_dir=music_dir)
+        result = await server.tidy_analyse(music_dir=music_dir)
+        result["accepted_album_variants"] = accepted["accepted"]
+        result["note"] = "album-title merges written to approved.py and the plan redone; still a dry run"
+        return result
+
     if apply:
         return await server.tidy_apply(music_dir=music_dir, confirm=True, force=force)
 

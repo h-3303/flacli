@@ -299,3 +299,30 @@ def test_apply_new_touches_only_the_new_files(library):
     make_flac(library / "dup.flac", artist="Art", album="Alb", title="Two", tracknumber="2")
     result = Tidy(library).apply_new([library / "dup.flac"])
     assert result["moved"] == 0 and "clash" in result["held"][0]["why"] and (library / "dup.flac").is_file()
+
+
+def test_album_title_variants_are_offered_and_accepted(library):
+    make_flac(library / "Artist A" / "Album A" / "01 - One.flac", artist="Artist A", albumartist="Artist A", album="Album A",
+              title="One", tracknumber="1", date="2001")
+    make_flac(library / "Artist A" / "Album A" / "02 - Two.flac", artist="Artist A", albumartist="Artist A", album="Album A",
+              title="Two", tracknumber="2", date="2001")
+    make_flac(library / "Artist A" / "Box - Album A" / "03 - Three.flac", artist="Artist A", albumartist="Artist A",
+              album="Box - Album A", title="Three", tracknumber="3", date="2001")
+    make_flac(library / "Artist A" / "Album A (Disc 2)" / "01 - Four.flac", artist="Artist A", albumartist="Artist A",
+              album="Album A (Disc 2)", title="Four", tracknumber="1", date="2001")
+    settle(library)
+
+    summary = Tidy(library).analyse()
+    variants = summary["open_questions"]["album_title_variants"]
+    assert [(v["variant"], v["canonical"], v["files"]) for v in variants] == [("Album A (Disc 2)", "Album A", 1), ("Box - Album A", "Album A", 1)]
+    assert "1d." in Path(summary["report_path"]).read_text() and summary["moves"] == 0
+
+    accepted = Tidy(library).accept_album_variants()
+    assert [v["variant"] for v in accepted["accepted"]] == ["Album A (Disc 2)", "Box - Album A"]
+    approved = Path(summary["approved_path"]).read_text()
+    assert "'box - album a': 'Album A'" in approved and "'album a (disc 2)': 'Album A'" in approved
+
+    summary = Tidy(library).analyse()
+    assert summary["open_questions"]["album_title_variants"] == []
+    assert summary["tag_changes"]["by_rule"]["R4 album title canonical form"]["files"] == 2
+    assert summary["moves"] == 2
