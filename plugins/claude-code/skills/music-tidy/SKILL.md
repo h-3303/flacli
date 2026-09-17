@@ -1,6 +1,6 @@
 ---
 name: music-tidy
-description: Clean up and organise the local music library. Normalise tags, drop lossy duplicates of FLACs, remove playlist dumps, file everything as Artist/Album/NN - Title.ext, clear download reports out of the library, and give every artist a picture for the player. New downloads are filed automatically as they land (tidy_new does it for files that arrived any other way); this skill is the full pass for everything else. Use when the user says "/music-tidy", "tidy my music", "clean up the music folder", "sort the new downloads", "organise my library", "fill in the artist pictures", "the artist avatars are missing", or mentions stray tracks, duplicate m4a/flac copies, messy tags, or blank artist images.
+description: Clean up and organise the local music library. Normalise tags, drop lossy duplicates of FLACs, remove playlist dumps, file everything as Artist/Album/NN - Title.ext, clear download reports out of the library, and give every artist a picture and every album a cover for the player. New downloads are filed automatically as they land (tidy_new does it for files that arrived any other way); this skill is the full pass for everything else. Use when the user says "/music-tidy", "tidy my music", "clean up the music folder", "sort the new downloads", "organise my library", "fill in the artist pictures", "the artist avatars are missing", "the album covers are missing", "fix the cover art", or mentions stray tracks, duplicate m4a/flac copies, messy tags, or blank artist images.
 tags: [music, tags, library]
 ---
 
@@ -64,6 +64,25 @@ a lookup fails it never retries that artist. The four `avatar_*` tools give ever
 Report the filled artists as name, source and licence, and name those still without a picture. This is
 step 6 of the procedure and is safe on its own: it writes only pictures, never tags or moves.
 
+## Album covers
+
+An album with no `cover.jpg` and no picture in its tracks shows as a grey square, and once the player's
+lookup has failed it never asks again. The four `cover_*` tools give every album one:
+
+- `cover_todo()`: albums with no cover file beside the music, or with tracks that carry no picture. Say
+  how many.
+- `cover_fill(limit=10)`: the first provider with a cover, in order: a picture a tagger left in the album
+  folder or embedded in a track, the Cover Art Archive front (the tagged release, then the release group
+  MusicBrainz finds), Deezer's album search, the iTunes Search API, exact artist and title matches only.
+  Saved as `Artist/Album/cover.jpg`, embedded in every track that has no picture (never replacing one;
+  `embed=False` leaves the tags alone), its origin kept in `.wiki/covers.json`, and written into the
+  player's cache under the album's folder, clearing the failed-lookup memo. Call again while `remaining` > 0.
+- `cover_set(artist, album, source, attribution=None)`: one cover from a file or URL the user supplied.
+- `cover_push(artist=None, album=None)`: write the cover files into the player again.
+
+Report the filled albums as artist, album and source, and name those still without a cover. Step 7 of the
+procedure; embedding writes a picture block into the tracks and nothing else.
+
 ## Tools
 
 - `tidy_new(paths=None, music_dir=None)`: the scoped pass above. Moves files but never deletes; safe
@@ -111,6 +130,8 @@ same planner is available from a shell as `flacli tidy [--apply] [--force] [root
 6. **Artist pictures.** `avatar_todo`, then `avatar_fill` until `remaining` is 0; ask the user for a
    file or URL for the rest and store it with `avatar_set`. Needs no approval: nothing is deleted or
    moved, and every picture's origin is recorded.
+7. **Album covers.** `cover_todo`, then `cover_fill` until `remaining` is 0; ask the user for a file or
+   URL for the rest and store it with `cover_set`. Say that tracks without a picture get one embedded.
 
 ## Guardrails
 

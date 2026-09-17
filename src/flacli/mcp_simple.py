@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The simple MCP server: fifteen coarse tools, each one whole step, for small or local models.
 
-`flacli mcp` runs it over stdio. Capable models can use `flacli mcp --full` (51 fine-grained tools) instead.
+`flacli mcp` runs it over stdio. Capable models can use `flacli mcp --full` (55 fine-grained tools) instead.
 """
 
 import functools

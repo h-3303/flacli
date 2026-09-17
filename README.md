@@ -14,7 +14,7 @@ The same engine now has three front doors, so the tool works with whatever drive
 | --- | --- | --- |
 | **CLI** | `flacli get "Lorde - Royals"` | any agent with a shell, including small local models; humans |
 | **Simple MCP** | `flacli mcp` | MCP clients with a modest model: fifteen coarse tools, one step each |
-| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (51) |
+| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (55) |
 
 Every CLI command prints one JSON object and returns within seconds; Soulseek matching runs in a detached worker
 and `flacli status` follows it. `flacli guide` prints the workflow for an agent to read.
@@ -65,6 +65,7 @@ flacli m3u 2
 flacli tidy && flacli tidy --apply    # library clean-up: plan, then apply
 flacli mpd                            # is the player's MPD reachable, and does it serve the same library?
 flacli avatar fill                    # a picture for every artist: Wikidata portrait, MusicBrainz, Deezer
+flacli cover fill                     # a cover for every album: Cover Art Archive, Deezer, iTunes; embedded too
 flacli wiki missing                   # artists and albums whose bio / wiki in the player is empty
 flacli wiki fill                      # Wikipedia's lead paragraph where an article exists, attributed
 flacli wiki set "Artist" "Album" --text-file t.txt --attribution "Written by ... from MusicBrainz"
@@ -82,7 +83,7 @@ through MPD and through files beside the music, nothing else:
 - **Playlists.** `flacli m3u` writes the M3U8 and also stores the playlist in MPD under its own name
   (`playlistclear` + `playlistadd`), so it appears in the player's Playlists view; tracks MPD does not know yet get
   their folders updated first. `flacli mpd playlist <id>` does the MPD half on its own.
-- **Bios, wikis, pictures.** `flacli wiki` and `flacli avatar` write `Artist/artist.md`, `Artist/Album/wiki.md` and
+- **Bios, wikis, pictures, covers.** `flacli wiki`, `flacli avatar` and `flacli cover` write `Artist/artist.md`, `Artist/Album/wiki.md` and
   `Artist/artist.jpg` beside the music. Flaclify reads those files itself, before any online provider, and re-reads
   one whenever it is newer than its cached copy. The direct write into a player's cache (`wiki_targets`, default
   `flaclify`) is still there for Euphonica and for album covers; set it to nothing once the files alone are enough.
@@ -101,6 +102,17 @@ and licence recorded), else a MusicBrainz image relation, else Deezer's public a
 match. It is saved beside the music as `Artist/artist.jpg`, where Navidrome and Jellyfin look too, its origin in
 `.wiki/avatars.json`, and written into the player's image cache the way the player would have, so it shows at
 once. `flacli avatar set "Artist" photo.jpg` uses a picture of your own.
+
+### Album covers
+
+An album with no `cover.jpg` and no picture in its tracks shows as a grey square, and once the player's lookup
+has failed it never asks again. `flacli cover fill` gives every album one: a picture a tagger left in the folder
+or embedded in a track, else the Cover Art Archive front (the tagged release, then the release group MusicBrainz
+finds), else Deezer's album search, else the iTunes Search API, each for an exact artist and title match. It is
+saved as `Artist/Album/cover.jpg`, where MPD's `albumart`, Navidrome and Jellyfin look, embedded in every track
+that has no picture (never replacing one; `--no-embed` leaves the tags alone), its origin kept in
+`.wiki/covers.json`, and written into the player's cache under the album's folder, clearing the failed-lookup
+memo. `flacli cover set "Artist" "Album" front.png` uses a scan of your own.
 
 ### Bios and wikis
 
