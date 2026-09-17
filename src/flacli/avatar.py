@@ -24,6 +24,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -32,6 +33,7 @@ import uuid
 from pathlib import Path
 
 from .db import Database
+from .musicbrainz import BUSY_BACKOFF_S
 from .wiki import LOOSE_DIR, Sources, WikiError, _fold, _now, find_entry, inventory
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
@@ -128,23 +130,31 @@ def save_picture(root: Path, entry: dict, data: bytes, ext: str) -> str:
 
 # Sources #
 
-def default_fetch_bytes(url: str, user_agent: str) -> bytes:
+def default_fetch_bytes(url: str, user_agent: str, sleep=time.sleep) -> bytes:
+    """Download one picture; a 429 or 503 (Commons rate-limits bursts) is retried after 2, 4 and 8 seconds."""
     request = urllib.request.Request(url, headers={"User-Agent": user_agent})
 
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return response.read()
-    except urllib.error.HTTPError as error:
-        raise WikiError(f"HTTP {error.code} for {url}") from None
-    except (urllib.error.URLError, TimeoutError) as error:
-        raise WikiError(f"unreachable: {url} ({error})") from None
+    for pause in BUSY_BACKOFF_S + (None,):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            if error.code in (429, 503) and pause is not None:
+                sleep(pause)
+                continue
+
+            raise WikiError(f"HTTP {error.code} for {url}") from None
+        except (urllib.error.URLError, TimeoutError) as error:
+            raise WikiError(f"unreachable: {url} ({error})") from None
+
+    raise WikiError(f"gave up on {url}")   # unreachable: the last attempt raises or returns
 
 
 def _strip_html(text: str | None) -> str | None:
     if not text:
         return None
 
-    return html.unescape(re.sub(r"<[^>]+>", "", text)).strip() or None
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", text))).strip() or None
 
 
 class PictureSources:
@@ -156,6 +166,13 @@ class PictureSources:
         self._fetch_bytes = fetch_bytes or default_fetch_bytes
 
     def download(self, url: str) -> bytes:
+        """One picture, paced like the JSON lookups: at most one request a second to the same hosts."""
+        wait = 1.0 - (time.monotonic() - self.sources._last)
+
+        if wait > 0:
+            self.sources._sleep(wait)
+
+        self.sources._last = time.monotonic()
         return self._fetch_bytes(url, self.sources.user_agent)
 
     def commons(self, file_name: str, source: str) -> dict | None:

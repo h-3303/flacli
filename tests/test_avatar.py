@@ -223,6 +223,44 @@ def test_push_into_a_player_without_the_table_or_database(tmp_path):
     assert avatar.push_avatar(other, "X", tmp_path / "X" / "artist.jpg") == "not a Flaclify/Euphonica metadata database (no images table)"
 
 
+def test_picture_download_retries_a_rate_limit(monkeypatch):
+    import urllib.error
+    import urllib.request
+
+    attempts, pauses = [], []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b"bytes"
+
+    def urlopen(request, timeout):
+        attempts.append(request.full_url)
+
+        if len(attempts) < 3:
+            raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, None)
+
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    assert avatar.default_fetch_bytes("https://x/y.jpg", "flacli/test", sleep=pauses.append) == b"bytes"
+    assert len(attempts) == 3 and pauses == [2, 4]
+
+    attempts.clear()
+    monkeypatch.setattr(urllib.request, "urlopen", lambda request, timeout: (_ for _ in ()).throw(
+        urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)))
+
+    with pytest.raises(avatar.WikiError, match="HTTP 404"):
+        avatar.default_fetch_bytes("https://x/z.jpg", "flacli/test", sleep=pauses.append)
+
+    assert avatar._strip_html('<a href="x">Someone</a>\n\n(Original text: Someone (talk))') == "Someone (Original text: Someone (talk))"
+
+
 def test_player_settings_fall_back_to_the_schema_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))   # no gsettings binary
     assert avatar.player_settings(tmp_path / "flaclify" / "metadata.sqlite") == avatar.DEFAULT_SETTINGS
