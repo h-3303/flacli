@@ -46,21 +46,33 @@ src/flacli/
                     server._request_job (request: match, auto-approve >= min_confidence, queue).
                     PREF_FIELDS is the serialisable subset of MatchPrefs; prefs_to()/prefs_from() are
                     the only way prefs cross the process boundary. SIGTERM/SIGINT cancel the task.
-  server.py         The FULL MCP server (name "flacli", 30 tools) — the original claude-music library
-                    server, tool names unchanged. State{db, bridge, jobs, mb_fetch, mb_sleep} is the
+  server.py         The FULL MCP server (name "flacli", 34 tools) — the original claude-music library
+                    server, tool names unchanged, plus the four wiki_* tools. State{db, bridge, jobs, mb_fetch, mb_sleep} is the
                     process-wide context that simple.py and worker.py also use; tests inject
                     mb_fetch/mb_sleep. In-process background jobs live in State.jobs (asyncio tasks)
                     when a job is started through this server; the CLI/simple server use workers
                     instead. Both write the same jobs table, so `flacli status` sees either.
   soulseek_mcp.py   The raw Nicotine+ MCP server (name "soulseek", 13 tools): search, browse, download,
                     transfers. Was a uv single-file script; now a module using config.bridge_socket_path().
-  mcp_simple.py     The SIMPLE MCP server (name "flacli", 11 coarse tools) over simple.py, for small
+  mcp_simple.py     The SIMPLE MCP server (name "flacli", 15 coarse tools) over simple.py, for small
                     models. `flacli mcp` runs this one by default.
+  wiki.py           Artist bios and album wikis. inventory() groups the library index into albums (by
+                    folder + album tag; artist = albumartist, else the commonest track artist) and
+                    artists. Text lives in sidecars (<Artist>/artist.md, <album folder>/wiki.md; an
+                    artist with no folder of their own gets .wiki/<name>.md), front matter + plain text.
+                    Sources (MusicBrainz via the shared client, Wikidata sitelink, Wikipedia extracts
+                    API; all through mb_cache at 1 req/s) → fill() writes Wikipedia leads, set_text()
+                    stores agent prose, push_entry() upserts into a Flaclify/Euphonica metadata.sqlite
+                    (albums keyed by mbid, else title+albumartist — an album with neither is skipped;
+                    artists by mbid, else name), rewriting the BSON document with only wiki/bio changed.
+                    Never creates the player's database. WikiError is in every error list.
+  bsonlite.py       Minimal BSON codec for those documents (serde subset; raises on unknown types).
   GUIDE.md          The agent guide (`flacli guide`). Written for the smallest model that might follow
                     it. Keep the "## Quick reference" heading: --short prints from it to the next "## ".
   bridge.py         Async client for the bridge socket (protocol v1/v2). BridgeUnavailable / RateLimited.
   db.py             SQLite (WAL, check_same_thread=False): playlists, tracks, matches, jobs, library
-                    index, cache, user penalties. schema_version 1.
+                    index, cache, user penalties. schema_version 2 (2 added albumartist +
+                    mb_artist_id to library_files and reset mtime so the next scan re-reads tags).
   matcher.py        MatchPrefs, MatchJob (searches through the bridge, scores results, album pass),
                     scoring functions. Honours the bridge's rate limit by waiting, never by retrying.
   requester.py      parse_items()/expand(): "Artist - Title", "Artist - Album (album)", dicts ->
@@ -77,7 +89,7 @@ src/flacli/
 
 plugins/claude-code/  The Claude Code wrapper plugin ("flacli"): .mcp.json runs `flacli mcp --full`
                     (server "flacli") and `flacli mcp --soulseek` (server "soulseek") from PATH; the
-                    two skills (playlist-sync, music-tidy), the matcher agent, the SessionStart hook
+                    three skills (playlist-sync, music-tidy, wiki-fill), the matcher agent, the SessionStart hook
                     (is `flacli` on PATH, is the bridge reachable — via `flacli --compact doctor`),
                     and the downloads monitor (polls the bridge, one line per finished/failed
                     transfer; reads data_dir and the socket from `flacli --compact config`). No
@@ -104,8 +116,9 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     detached worker against the harness, the simple server over stdio),
                     test_mcp_server.py (soulseek + full servers over stdio), test_e2e_pipeline.py
                     (the original pipeline), test_requests.py, test_tidy.py, test_connectors.py
-                    (recorded fixtures), test_claude_plugin.py (manifests validate strictly when
-                    `claude` is installed). 156+ tests, ~60 s.
+                    (recorded fixtures), test_wiki.py (BSON codec, sidecars, sources through a fake
+                    web, push into a Flaclify-shaped sqlite), test_claude_plugin.py (manifests validate
+                    strictly when `claude` is installed). 170 tests, ~65 s.
 ```
 
 ## Cross-file couplings (each fails quietly)
@@ -128,7 +141,14 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
 - `GUIDE.md` ↔ `cli.py` commands and flags. The guide is what an agent reads; a flag renamed in
   argparse and not in the guide is a flag the agent will get wrong.
 - `mcp_simple.py` tool list ↔ `tests/test_worker_e2e.py::test_simple_mcp_server_tool_list` (exact set)
-  ↔ the site's "eleven coarse tools" and README.
+  ↔ the site's "fifteen coarse tools" and README; the full server's count (47 with soulseek) is in
+  cli.py's `--full` help, mcp_simple.py's docstring, README and the site.
+- `wiki.push_entry` ↔ Flaclify's `cache/sqlite.rs` (tables albums/artists, BSON `AlbumMeta` /
+  `ArtistMeta` from `meta_providers/models.rs`, keys: album mbid else title+albumartist, artist mbid
+  else name; `last_modified` RFC 3339). Serde needs every non-Option field present, so a new
+  document must carry name/tags/image (+ similar/artist_type for artists). Flaclify's three-way
+  timestamp compare shows our row as "local, newer than MPD" and offers its own sync button.
+- `MIGRATIONS` length ↔ `schema_version` assertions in test_library_db_mb.py and test_mcp_server.py.
 - `site/index.html` ld+json `softwareVersion` and the test count in the black band ↔ reality. Reshoot
   `og.png` when the top of the page changes; the portfolio plate
   (`~/dev/portfolio/assets/projects/flacli-site.webp`) is a separate shot, reshoot under a new name.

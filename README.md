@@ -13,8 +13,8 @@ The same engine now has three front doors, so the tool works with whatever drive
 | Front door | Run | For |
 | --- | --- | --- |
 | **CLI** | `flacli get "Lorde - Royals"` | any agent with a shell, including small local models; humans |
-| **Simple MCP** | `flacli mcp` | MCP clients with a modest model: eleven coarse tools, one step each |
-| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (43) |
+| **Simple MCP** | `flacli mcp` | MCP clients with a modest model: fifteen coarse tools, one step each |
+| **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (47) |
 
 Every CLI command prints one JSON object and returns within seconds; Soulseek matching runs in a detached worker
 and `flacli status` follows it. `flacli guide` prints the workflow for an agent to read.
@@ -47,7 +47,7 @@ flacli config set contact you@example.com     # sent in the MusicBrainz User-Age
 ```
 
 Settings live in `~/.config/flacli/config.toml`; environment variables (`FLACLI_MUSIC_DIR`, `FLACLI_DATA`,
-`FLACLI_CONTACT`, `NICOTINE_MCP_SOCKET`, `FLACLI_TIDAL_CLIENT_ID`, `FLACLI_AUTO_TIDY`) override them.
+`FLACLI_CONTACT`, `NICOTINE_MCP_SOCKET`, `FLACLI_TIDAL_CLIENT_ID`, `FLACLI_AUTO_TIDY`, `FLACLI_WIKI_TARGETS`) override them.
 
 ## Use from a shell
 
@@ -62,9 +62,22 @@ flacli review 2 --doubtful            # the matches below 0.85, with reasons
 flacli approve 2 --tracks 14,15 && flacli skip 2 --tracks 16
 flacli m3u 2
 flacli tidy && flacli tidy --apply    # library clean-up: plan, then apply
+flacli wiki missing                   # artists and albums whose bio / wiki in the player is empty
+flacli wiki fill                      # Wikipedia's lead paragraph where an article exists, attributed
+flacli wiki set "Artist" "Album" --text-file t.txt --attribution "Written by ... from MusicBrainz"
 ```
 
 `flacli --help` and `flacli <command> --help` document every flag.
+
+### Bios and wikis
+
+Flaclify and Euphonica show a bio under each artist and a wiki under each album, and for most libraries
+they are empty. `flacli wiki` fills them: the text lives as `Artist/artist.md` and `Artist/Album/wiki.md`
+beside the music (front matter with the source and licence, plain text below) and is pushed into the
+player's `metadata.sqlite`, where it appears in the wiki panel and can be backed up to MPD from there.
+`fill` takes Wikipedia verbatim where MusicBrainz links an article; for the rest, `sources` hands an agent
+the MusicBrainz facts and links to write from, and `set` stores what it wrote with an attribution that
+names the sources and the model. `wiki_targets` chooses the players (`flaclify`, `euphonica`, or a path).
 
 ## Use from an agent
 

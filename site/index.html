@@ -30,7 +30,7 @@
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "Command-line tool and MCP server",
   "operatingSystem": "Linux",
-  "softwareVersion": "0.1.0",
+  "softwareVersion": "0.2.0",
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "isAccessibleForFree": true,
   "codeRepository": "https://github.com/h-3303/flacli",
@@ -116,12 +116,12 @@
         <div class="door" style="transform: rotate(0.4deg)">
           <div class="door__name">Simple MCP</div>
           <div class="door__cmd">flacli mcp</div>
-          <p class="door__for">Eleven coarse tools, one workflow step each. For MCP clients with a modest model.</p>
+          <p class="door__for">Fifteen coarse tools, one workflow step each. For MCP clients with a modest model.</p>
         </div>
         <div class="door" style="transform: rotate(-0.3deg)">
           <div class="door__name">Full MCP</div>
           <div class="door__cmd">flacli mcp --full</div>
-          <p class="door__for">Every fine-grained tool, forty-three of them. For models that can plan a nine-step pipeline.</p>
+          <p class="door__for">Every fine-grained tool, forty-seven of them. For models that can plan a nine-step pipeline.</p>
         </div>
       </div>
     </div>
@@ -192,6 +192,7 @@ flacli guide                               # hand this to the agent</pre>
         <li><code>flacli queue &lt;id&gt; [--yes]</code><span>totals without the flag; transfers only with it</span></li>
         <li><code>flacli m3u &lt;id&gt;</code><span>the file, in order, and the list of what is still missing</span></li>
         <li><code>flacli tidy [--apply]</code><span>the library put in order; a report and a plan first, writes only with the flag</span></li>
+        <li><code>flacli wiki missing · fill · set</code><span>the empty bio and wiki panels in Flaclify / Euphonica: Wikipedia where an article exists, the agent's own prose from MusicBrainz facts for the rest, each attributed, kept as Markdown beside the music</span></li>
         <li><code>flacli search · download · downloads</code><span>the bridge on its own: raw Soulseek search, a whole folder, the transfer list</span></li>
         <li><code>flacli service · config · doctor</code><span>TIDAL and YouTube Music logins stored 0600 on your disk; settings; the health check that says what to fix</span></li>
       </ul>
@@ -254,7 +255,7 @@ $ flacli status 1
 
     <div class="row" style="margin-top: 26px; flex-wrap: wrap; align-items: center">
       <div class="dtw-torn-scrap dtw-torn-scrap--v1 dtw-xerox" style="transform: rotate(-0.9deg); max-width: 300px">
-        <p class="dtw-typewriter" style="font-size: 11px">Tested against Nicotine+ 3.3.10, 3.3.11 and master. 156 tests: a headless Nicotine+ core in-process, fake Soulseek peers, all three MCP servers over stdio, the CLI end to end through a real detached worker, a synthetic library tidied, the service connectors on recorded fixtures. Nothing touches the network.</p>
+        <p class="dtw-typewriter" style="font-size: 11px">Tested against Nicotine+ 3.3.10, 3.3.11 and master. 170 tests: a headless Nicotine+ core in-process, fake Soulseek peers, all three MCP servers over stdio, the CLI end to end through a real detached worker, a synthetic library tidied, the service connectors on recorded fixtures. Nothing touches the network.</p>
       </div>
       <div class="dtw-pasted-slip dtw-pasted-slip--hand" style="transform: rotate(-1.6deg); font-size: 30px">everything stays on your machine</div>
     </div>

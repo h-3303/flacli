@@ -119,3 +119,4 @@ variables, so an MCP server entry can carry per-client overrides:
 | `bridge_socket` | `NICOTINE_MCP_SOCKET` | only if you changed the socket in the Nicotine+ plugin settings |
 | `tidal_client_id` | `FLACLI_TIDAL_CLIENT_ID` | your TIDAL app's client id |
 | `auto_tidy` | `FLACLI_AUTO_TIDY` | file each finished download as Artist/Album/NN - Title (default on) |
+| `wiki_targets` | `FLACLI_WIKI_TARGETS` | player caches that receive bios and wikis: `flaclify`, `euphonica`, or a path to a `metadata.sqlite`, comma-separated (default `flaclify`) |
