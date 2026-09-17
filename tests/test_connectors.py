@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library.connectors import ConnectorError, get_connector, iso_duration_ms
-from claude_music_library.connectors import deezer, tidal, ytmusic
-from claude_music_library.connectors.oauth import LoopbackListener, TokenStore, code_challenge, code_verifier
+from flacli.connectors import ConnectorError, get_connector, iso_duration_ms
+from flacli.connectors import deezer, tidal, ytmusic
+from flacli.connectors.oauth import LoopbackListener, TokenStore, code_challenge, code_verifier
 
 FIXTURES = Path(__file__).parent / "fixtures" / "connectors"
 
@@ -425,10 +425,10 @@ def test_registry_and_aliases():
 
 @pytest.fixture
 def library(tmp_path, monkeypatch):
-    import claude_music_library.server as server
+    import flacli.server as server
 
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(tmp_path / "data"))
-    monkeypatch.setenv("CLAUDE_MUSIC_TIDAL_CLIENT_ID", "")
+    monkeypatch.setenv("FLACLI_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("FLACLI_TIDAL_CLIENT_ID", "")
     server.State.db = None
     yield server
 

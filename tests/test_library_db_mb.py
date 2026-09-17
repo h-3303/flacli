@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library.db import Database
-from claude_music_library.library import diff_playlist, find_local, scan_library
-from claude_music_library.models import Track
-from claude_music_library.musicbrainz import MusicBrainzClient
+from flacli.db import Database
+from flacli.library import diff_playlist, find_local, scan_library
+from flacli.models import Track
+from flacli.musicbrainz import MusicBrainzClient
 
 from libtools import FakeMusicBrainz, make_flac, recording
 
@@ -64,7 +64,7 @@ def test_musicbrainz_resolver_rate_limit_and_cache(db):
         recording("r-two", "Song Two", "Artist A", 210000, "rel-a", "Album A", 10),
     ], isrcs={"USAAA0100001": [recording("r-one-isrc", "Song One", "Artist A", 200000, "rel-a", "Album A", 10)]})
     naps = []
-    client = MusicBrainzClient(db, "claude-music/test ( tests )", fetch=fake, sleep=naps.append)
+    client = MusicBrainzClient(db, "flacli/test ( tests )", fetch=fake, sleep=naps.append)
 
     hit = client.resolve("Song One", "Artist A", "Album A", duration_ms=201000)
     assert hit["recording_id"] == "r-one" and hit["release_id"] == "rel-a" and hit["release_track_count"] == 10

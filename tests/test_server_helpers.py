@@ -1,20 +1,12 @@
-"""Pure helpers of the MCP server, imported directly from the script."""
-
-import importlib.util
-
-from pathlib import Path
+"""Pure helpers of the Soulseek MCP server."""
 
 import pytest
-
-SERVER = Path(__file__).resolve().parent.parent / "plugins" / "claude-music" / "servers" / "nicotine_mcp.py"
 
 
 @pytest.fixture(scope="module")
 def server():
-    spec = importlib.util.spec_from_file_location("nicotine_mcp_under_test", SERVER)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    from flacli import soulseek_mcp
+    return soulseek_mcp
 
 
 def result(path, user="u", size=1_000_000, free_slot=True, speed=100_000, queue=0, **attrs):

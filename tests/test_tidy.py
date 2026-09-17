@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library import tidy
-from claude_music_library.tidy import Tidy, TidyError
+from flacli import tidy
+from flacli.tidy import Tidy, TidyError
 
 from libtools import make_flac
 
@@ -234,11 +234,11 @@ def test_cli(library, capsys):
 
 @pytest.mark.anyio
 async def test_server_tools_confirm_gate(library, monkeypatch):
-    from claude_music_library import server
+    from flacli import server
 
     make_flac(library / "a.flac", artist="Art", album="Alb", title="One", tracknumber="1")
     settle(library)
-    monkeypatch.setenv("CLAUDE_MUSIC_DIR", str(library))
+    monkeypatch.setenv("FLACLI_MUSIC_DIR", str(library))
 
     summary = await server.tidy_analyse()
     assert summary["moves"] == 1 and summary["root"] == str(library)

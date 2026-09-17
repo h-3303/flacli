@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library import textnorm
-from claude_music_library.importers import detect_format, import_file
-from claude_music_library.jspf import track_from_jspf, track_to_jspf, write_jspf
-from claude_music_library.m3u import write_m3u
-from claude_music_library.models import Track
+from flacli import textnorm
+from flacli.importers import detect_format, import_file
+from flacli.jspf import track_from_jspf, track_to_jspf, write_jspf
+from flacli.m3u import write_m3u
+from flacli.models import Track
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

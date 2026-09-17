@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://claude-music-liard.vercel.app/sitemap.xml

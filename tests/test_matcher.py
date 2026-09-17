@@ -2,7 +2,7 @@
 
 import pytest
 
-from claude_music_library.matcher import MatchPrefs, best_candidates, build_queries, download_id, score_folder, score_result
+from flacli.matcher import MatchPrefs, best_candidates, build_queries, download_id, score_folder, score_result
 
 TRACK = {"id": 1, "title": "Lonely Song - 2011 Remaster", "artist": "Solo C, Guest", "album": "Alone", "duration_ms": 185000}
 

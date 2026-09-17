@@ -1,8 +1,0 @@
-[
-  {
-    "name": "downloads",
-    "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/monitors/downloads.py \"${CLAUDE_PLUGIN_DATA}\"",
-    "description": "Nicotine+ downloads finishing or failing (one line each; quiet otherwise)",
-    "when": "on-skill-invoke:playlist-sync"
-  }
-]

@@ -14,12 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library.beets import Beets, BeetsError
-from claude_music_library.db import Database
-from claude_music_library.models import Track
-from claude_music_library.troi_resolver import Troi, TroiError
+from flacli.beets import Beets, BeetsError
+from flacli.db import Database
+from flacli.models import Track
+from flacli.troi_resolver import Troi, TroiError
 
-PLUGIN = Path(__file__).resolve().parent.parent / "plugins" / "claude-music"
 
 
 def fake_tool(directory: Path, name: str, body: str) -> Path:
@@ -69,7 +68,7 @@ elif cmd == "ls":
 def beet(tmp_path, monkeypatch):
     log = tmp_path / "beet.log"
     monkeypatch.setenv("FAKE_LOG", str(log))
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("FLACLI_DATA", str(tmp_path / "data"))
     executable = fake_tool(tmp_path, "beet", BEET_BODY)
     return Beets(which=lambda name: str(executable) if name == "beet" else None), log
 
@@ -165,7 +164,7 @@ elif ARGS[0] == "resolve":
 def troi(tmp_path, monkeypatch):
     log = tmp_path / "troi.log"
     monkeypatch.setenv("FAKE_LOG", str(log))
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("FLACLI_DATA", str(tmp_path / "data"))
     executable = fake_tool(tmp_path, "troi", TROI_BODY)
     return Troi(which=lambda name: str(executable) if name == "troi" else None, db_file=tmp_path / "data" / "troi.db"), log
 
@@ -228,9 +227,9 @@ def test_parse_m3u():
 
 @pytest.fixture
 def library(tmp_path, monkeypatch):
-    import claude_music_library.server as server
+    import flacli.server as server
 
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("FLACLI_DATA", str(tmp_path / "data"))
     server.State.db = None
     yield server
 
@@ -283,70 +282,3 @@ async def test_troi_resolve_tool(library, troi, tmp_path, monkeypatch):
 
     status = await library.troi_status()
     assert status["indexed"] is True
-
-
-# Download monitor #
-
-def load_monitor():
-    spec = importlib.util.spec_from_file_location("claude_music_monitor", PLUGIN / "monitors" / "downloads.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_monitor_manifest_and_socket_lookup(tmp_path, monkeypatch):
-    manifest = json.loads((PLUGIN / "monitors" / "monitors.json").read_text())
-    (entry,) = manifest
-    assert entry["name"] == "downloads" and entry["when"] == "on-skill-invoke:playlist-sync"
-    assert "monitors/downloads.py" in entry["command"] and "${user_config" not in entry["command"]
-
-    monitor = load_monitor()
-    monkeypatch.delenv("NICOTINE_MCP_SOCKET", raising=False)
-    (tmp_path / "bridge_socket").write_text("/custom/path.sock\n")
-    candidates = monitor.socket_candidates(str(tmp_path))
-    assert candidates[0] == "/custom/path.sock" and candidates[1].endswith("nicotine-mcp.sock")
-    monkeypatch.setenv("NICOTINE_MCP_SOCKET", "/env/path.sock")
-    assert monitor.socket_candidates(str(tmp_path)) == ["/env/path.sock"]
-
-
-def test_monitor_reports_finished_and_failed(bridge, search, tmp_path, monkeypatch, capsys):
-    monitor = load_monitor()
-    monkeypatch.setenv("NICOTINE_MCP_SOCKET", bridge.socket_path)
-    files = [bridge.make_file("@@music\\Test Artist\\Album (2001)\\01 - One.flac", duration=200),
-             bridge.make_file("@@music\\Test Artist\\Album (2001)\\02 - Two.flac", duration=201)]
-    bridge.send_search_response(search, "peer1", files)
-    queued = bridge.rpc("download_results", search_id=search, result_ids=[0, 1])["queued"]
-
-    db = Database(tmp_path / "state.db")
-    playlist_id = db.add_playlist("Road Trip", "csv", [Track(title="One", artist="A")])
-    db.set_match(db.tracks(playlist_id)[0]["id"], "queued", download_id=queued[0]["download_id"])
-    db.close()
-
-    watcher = monitor.Monitor(str(tmp_path))
-    watcher.poll()
-    assert set(watcher.known) == {q["download_id"] for q in queued} and capsys.readouterr().out == ""
-
-    def finish():
-        for transfer in bridge.core.downloads.transfers.values():
-            transfer.status = "Finished" if transfer.virtual_path.endswith("01 - One.flac") else "Connection closed"
-
-    bridge.on_main(finish)
-    watcher.poll()
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0].startswith("claude-music: finished '01 - One.flac' from peer1 ->")
-    assert lines[0].endswith(f'(playlist {playlist_id} "Road Trip": call sync_downloads)')
-    assert lines[1] == "claude-music: connection closed: '02 - Two.flac' from peer1"
-    assert lines[2].startswith("claude-music: no downloads in progress")
-    assert len(lines) == 3
-
-    watcher.poll()
-    assert capsys.readouterr().out == "", "nothing new, nothing printed"
-
-
-def test_monitor_unreachable_bridge_is_quiet(tmp_path, monkeypatch, capsys):
-    monitor = load_monitor()
-    monkeypatch.setenv("NICOTINE_MCP_SOCKET", str(tmp_path / "nowhere.sock"))
-    watcher = monitor.Monitor(str(tmp_path))
-    watcher.poll()
-    watcher.poll()
-    assert watcher.known is None and capsys.readouterr().out == ""

@@ -293,48 +293,6 @@ wheels = [
 ]
 
 [[package]]
-name = "claude-music-dev"
-version = "0.0.0"
-source = { virtual = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "anyio" },
-    { name = "claude-music-library" },
-    { name = "mcp" },
-    { name = "pytest" },
-    { name = "pytest-timeout" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "anyio", specifier = ">=4" },
-    { name = "claude-music-library", editable = "plugins/claude-music/servers/library" },
-    { name = "mcp", specifier = ">=2.2,<3" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-timeout", specifier = ">=2.3" },
-]
-
-[[package]]
-name = "claude-music-library"
-version = "0.5.0"
-source = { editable = "plugins/claude-music/servers/library" }
-dependencies = [
-    { name = "mcp" },
-    { name = "mutagen" },
-    { name = "ytmusicapi" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "mcp", specifier = ">=2.2,<3" },
-    { name = "mutagen", specifier = ">=1.47" },
-    { name = "ytmusicapi", specifier = ">=1.8" },
-]
-
-[[package]]
 name = "click"
 version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -406,6 +364,37 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/e0/e786934472e3ac4ecdecc7b129a0ca1a2a40dffdafcf2c3ea9d4397f8def/cryptography-50.0.1-pp311-pypy311_pp73-manylinux_2_34_aarch64.whl", hash = "sha256:d63ae8f6481fec907ac0f588eee8a90aefde112c633131fe540e5711ddbb5a4e", size = 4698378, upload-time = "2026-08-25T19:45:33.043Z" },
     { url = "https://files.pythonhosted.org/packages/51/cf/5b3f53a0b74d122f023476ede40ba5d3e70d5cf475f73b899740d26a4fb2/cryptography-50.0.1-pp311-pypy311_pp73-manylinux_2_34_x86_64.whl", hash = "sha256:804728ce710890870f3aaa344b2e161172d258d768ac139d02cfd9092d0d94e6", size = 4706889, upload-time = "2026-08-25T19:45:35.086Z" },
     { url = "https://files.pythonhosted.org/packages/71/44/711e61f7d014be825ef79b285b047292d1bf893732ac1bc030a351fb517f/cryptography-50.0.1-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:693c99b49bd37d0d096e4334c10232c77248c415b98d35236094cdf96d57258b", size = 3824006, upload-time = "2026-08-25T19:45:37.281Z" },
+]
+
+[[package]]
+name = "flacli"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "mcp" },
+    { name = "mutagen" },
+    { name = "ytmusicapi" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "anyio" },
+    { name = "pytest" },
+    { name = "pytest-timeout" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mcp", specifier = ">=2.2,<3" },
+    { name = "mutagen", specifier = ">=1.47" },
+    { name = "ytmusicapi", specifier = ">=1.8" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "anyio", specifier = ">=4" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-timeout", specifier = ">=2.3" },
 ]
 
 [[package]]

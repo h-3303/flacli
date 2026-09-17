@@ -4,7 +4,7 @@ Selection, in order:
   NICOTINE_PLUS_SRC   explicit path to a Nicotine+ checkout (must contain pynicotine/)
   NICOTINE_PLUS_REF   git ref to use from the cache (default "3.3.10"; "master" is the dev branch)
 
-Checkouts are cached under $XDG_CACHE_HOME/claude-music/nicotine-plus/<ref>. Cloning needs the
+Checkouts are cached under $XDG_CACHE_HOME/flacli/nicotine-plus/<ref>. Cloning needs the
 network once; set NICOTINE_PLUS_OFFLINE=1 to forbid cloning (tests then skip if the ref is absent).
 NICOTINE_PLUS_UPDATE=1 fetches the latest commit for branch refs such as "master".
 """
@@ -20,7 +20,7 @@ REPO_URL = "https://github.com/nicotine-plus/nicotine-plus.git"
 
 def cache_root() -> Path:
     base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
-    return Path(base) / "claude-music" / "nicotine-plus"
+    return Path(base) / "flacli" / "nicotine-plus"
 
 
 def selected_ref() -> str:

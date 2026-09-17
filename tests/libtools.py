@@ -5,7 +5,7 @@ import urllib.parse
 
 from pathlib import Path
 
-from claude_music_library.textnorm import normalize
+from flacli.textnorm import normalize
 
 
 def make_flac(path: Path, seconds=200, sample_rate=44100, **tags):
@@ -78,7 +78,7 @@ class FakeMusicBrainz:
 
     def __call__(self, url, user_agent):
         self.urls.append(url)
-        assert "claude-music/" in user_agent
+        assert "flacli/" in user_agent
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query)
 

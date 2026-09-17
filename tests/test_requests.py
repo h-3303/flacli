@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from claude_music_library import requester
-from claude_music_library.db import Database
-from claude_music_library.musicbrainz import MusicBrainzClient
+from flacli import requester
+from flacli.db import Database
+from flacli.musicbrainz import MusicBrainzClient
 
 from libtools import FakeMusicBrainz, make_flac, release
 from test_e2e_pipeline import B_FOLDER, C_FOLDER, library_server  # noqa: F401 - fixture
@@ -50,7 +50,7 @@ def test_find_release_prefers_plain_official_album_and_lists_tracks(tmp_path):
         release("rel-boot", "Pure Heroine", "Lorde", [("x", "T", 1)], status="Bootleg"),
         release("rel-other", "Pure Heroine", "Someone Else", [("y", "T", 1)]),
     ])
-    client = MusicBrainzClient(db, "claude-music/test ( tests )", fetch=fake, sleep=lambda s: None)
+    client = MusicBrainzClient(db, "flacli/test ( tests )", fetch=fake, sleep=lambda s: None)
 
     chosen = client.find_release("Lorde", "Pure Heroine")
     assert chosen["release_id"] == "rel-plain" and chosen["track_count"] == 10 and chosen["artist"] == "Lorde"
@@ -175,7 +175,7 @@ async def test_request_music_downloads_directly_and_files_the_results(library_se
 
 async def test_auto_tidy_off_leaves_files_for_tidy_new(library_server, tmp_path, monkeypatch):
     server, harness, music, fake_mb, peers = library_server
-    monkeypatch.setenv("CLAUDE_MUSIC_AUTO_TIDY", "false")
+    monkeypatch.setenv("FLACLI_AUTO_TIDY", "false")
 
     result = await server.request_music(["Solo C - Lonely Song"], harvest_seconds=0.4)
     playlist_id = result["playlist_id"]
@@ -195,11 +195,11 @@ async def test_auto_tidy_off_leaves_files_for_tidy_new(library_server, tmp_path,
 
 
 async def test_tidy_new_finds_new_files_by_scanning(tmp_path, monkeypatch):
-    import claude_music_library.server as server
+    import flacli.server as server
 
     music = tmp_path / "Music"
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(tmp_path / "data"))
-    monkeypatch.setenv("CLAUDE_MUSIC_DIR", str(music))
+    monkeypatch.setenv("FLACLI_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("FLACLI_MUSIC_DIR", str(music))
     server.State.db = None
     old = time.time() - 3600
     make_flac(music / "old.flac", title="Old", artist="Art", album="Alb", tracknumber="1")

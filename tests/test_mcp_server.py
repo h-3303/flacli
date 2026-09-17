@@ -12,8 +12,8 @@ import pytest
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
-SERVER = Path(__file__).resolve().parent.parent / "plugins" / "claude-music" / "servers" / "nicotine_mcp.py"
-LIBRARY_SERVER = ["-m", "claude_music_library.server"]
+SOULSEEK_SERVER = ["-m", "flacli.soulseek_mcp"]
+LIBRARY_SERVER = ["-m", "flacli.server"]
 ALBUM = "@@music\\Test Artist\\Album (2001)"
 
 pytestmark = pytest.mark.anyio
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.anyio
 @asynccontextmanager
 async def mcp_session(socket_path, args=None, env=None):
     params = StdioServerParameters(
-        command=sys.executable, args=args or [str(SERVER)],
+        command=sys.executable, args=args or SOULSEEK_SERVER,
         env={**os.environ, "NICOTINE_MCP_SOCKET": socket_path, **(env or {})},
     )
 
@@ -218,7 +218,7 @@ async def test_rate_limit_error_is_explained(bridge):
 
 
 async def test_library_server_over_stdio(bridge, tmp_path):
-    env = {"CLAUDE_MUSIC_DATA": str(tmp_path / "data"), "CLAUDE_MUSIC_DIR": str(tmp_path / "Music")}
+    env = {"FLACLI_DATA": str(tmp_path / "data"), "FLACLI_MUSIC_DIR": str(tmp_path / "Music")}
 
     async with mcp_session(bridge.socket_path, args=LIBRARY_SERVER, env=env) as session:
         tools = {tool.name for tool in (await session.list_tools()).tools}

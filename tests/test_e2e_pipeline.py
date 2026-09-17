@@ -116,14 +116,14 @@ def finish_transfers(harness, music_root: Path):
 
 @pytest.fixture
 def library_server(bridge, tmp_path, monkeypatch):
-    import claude_music_library.server as server
-    from claude_music_library.bridge import BridgeClient
+    import flacli.server as server
+    from flacli.bridge import BridgeClient
 
     data = tmp_path / "data"
     music = tmp_path / "Music"
-    monkeypatch.setenv("CLAUDE_MUSIC_DATA", str(data))
-    monkeypatch.setenv("CLAUDE_MUSIC_DIR", str(music))
-    monkeypatch.setenv("CLAUDE_MUSIC_CONTACT", "tests")
+    monkeypatch.setenv("FLACLI_DATA", str(data))
+    monkeypatch.setenv("FLACLI_MUSIC_DIR", str(music))
+    monkeypatch.setenv("FLACLI_CONTACT", "tests")
 
     fake_mb = FakeMusicBrainz([
         recording("r-a1", "Song One", "Artist A", 200000, "rel-a", "Album A", 10),
