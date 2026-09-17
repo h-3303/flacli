@@ -21,10 +21,10 @@ def db(tmp_path):
 
 def test_migrations_are_versioned(tmp_path):
     database = Database(tmp_path / "state.db")
-    assert database.schema_version == 1
+    assert database.schema_version == 2
     database.close()
     again = Database(tmp_path / "state.db")   # reopening must not re-run migrations
-    assert again.schema_version == 1
+    assert again.schema_version == 2
     assert again.list_playlists() == []
     again.close()
 

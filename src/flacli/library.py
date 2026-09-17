@@ -48,10 +48,12 @@ def read_tags(path: Path) -> dict | None:
     return {
         "title": tag("title"),
         "artist": tag("artist", "albumartist"),
+        "albumartist": tag("albumartist"),
         "album": tag("album"),
         "isrc": (tag("isrc") or "").upper() or None,
         "mb_recording_id": tag("musicbrainz_trackid", "musicbrainz_recordingid"),
         "mb_release_id": tag("musicbrainz_albumid"),
+        "mb_artist_id": tag("musicbrainz_albumartistid", "musicbrainz_artistid"),
         "duration_ms": int(info.length * 1000) if getattr(info, "length", None) else None,
         "format": type(audio).__name__.lower(),
         "bitrate": getattr(info, "bitrate", None),
@@ -130,8 +132,9 @@ def index_file(db: Database, path: Path, stat=None) -> bool:
     title = tags["title"] or path.stem
     db.library_upsert(
         path=str(path), mtime=stat.st_mtime, size=stat.st_size, title=title, artist=tags["artist"],
-        album=tags["album"], duration_ms=tags["duration_ms"], isrc=tags["isrc"],
-        mb_recording_id=tags["mb_recording_id"], mb_release_id=tags["mb_release_id"], format=tags["format"],
+        albumartist=tags["albumartist"], album=tags["album"], duration_ms=tags["duration_ms"], isrc=tags["isrc"],
+        mb_recording_id=tags["mb_recording_id"], mb_release_id=tags["mb_release_id"],
+        mb_artist_id=tags["mb_artist_id"], format=tags["format"],
         bitrate=tags["bitrate"], sample_rate=tags["sample_rate"], bit_depth=tags["bit_depth"],
         title_norm=normalize(clean_title(title)), artist_norm=normalize(clean_title(tags["artist"] or "")),
         scanned_at=utcnow(),

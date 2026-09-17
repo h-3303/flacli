@@ -94,6 +94,13 @@ MIGRATIONS = [
         PRIMARY KEY (job_id, username)
     );
     """,
+    # 2: album artist and MusicBrainz artist id in the library index (wiki needs them); force a re-read of every
+    #    indexed file on the next incremental scan so the new columns get filled
+    """
+    ALTER TABLE library_files ADD COLUMN albumartist TEXT;
+    ALTER TABLE library_files ADD COLUMN mb_artist_id TEXT;
+    UPDATE library_files SET mtime = -1;
+    """,
 ]
 
 
