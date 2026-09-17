@@ -1,0 +1,41 @@
+{
+  "name": "flacli",
+  "description": "flacli for Claude Code: playlists and named albums onto disk through your own Nicotine+ (Soulseek) client and MusicBrainz, then a tidy library. Everything runs locally.",
+  "owner": {
+    "name": "h-3303",
+    "url": "https://github.com/h-3303"
+  },
+  "metadata": {
+    "description": "Add with: /plugin marketplace add h-3303/flacli"
+  },
+  "plugins": [
+    {
+      "name": "flacli",
+      "description": "The two skills (playlist-sync, music-tidy), the matcher agent, a session health check and a download monitor over the flacli command, which install.sh puts on PATH. Import playlists from TIDAL, Deezer, YouTube Music or an export file, or just name songs and albums; match them against your local library, fetch the missing tracks through Nicotine+ (Soulseek), file each one as it lands, write an M3U, and tidy the library.",
+      "version": "0.1.0",
+      "source": "./plugins/claude-code",
+      "homepage": "https://flacli.vercel.app",
+      "repository": "https://github.com/h-3303/flacli",
+      "license": "GPL-3.0-or-later",
+      "author": {
+        "name": "h-3303"
+      },
+      "category": "productivity",
+      "tags": [
+        "music",
+        "soulseek",
+        "nicotine-plus",
+        "playlists",
+        "spotify",
+        "musicbrainz",
+        "flac",
+        "mcp",
+        "tidal",
+        "deezer",
+        "youtube-music",
+        "beets",
+        "listenbrainz"
+      ]
+    }
+  ]
+}

@@ -76,6 +76,17 @@ For MCP clients, register `flacli mcp` (simple) or `flacli mcp --full`. [docs/in
 has the configuration for Claude Code, Codex CLI, Gemini CLI, opencode, Goose, Claude Desktop, and local
 models through Ollama or llama.cpp.
 
+### Claude Code plugin
+
+`install.sh` also registers the repository as a plugin marketplace and installs the `flacli` plugin when
+`claude` is on PATH; from inside Claude Code the equivalent is `/plugin marketplace add h-3303/flacli` then
+`/plugin install flacli@flacli` (and `install.sh` for the bridge and the command). The plugin is a thin
+wrapper: the two skills (`/playlist-sync`, `/music-tidy`), the matcher agent, a session health check and
+a download monitor, over `flacli mcp --full` and `flacli mcp --soulseek` from PATH. It has no settings
+of its own; `flacli config` is the one place. Coming from claude-music: `/plugin uninstall
+claude-music@claude-music`, then the steps above; the Nicotine+ bridge plugin is the same and needs no
+change.
+
 ## Services
 
 - **TIDAL**: official API, browser login. Register your own app at developer.tidal.com with the redirect URI

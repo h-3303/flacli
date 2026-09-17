@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "flacli",
+  "displayName": "flacli",
+  "version": "0.1.0",
+  "description": "Playlists and named albums onto disk through your own Nicotine+ (Soulseek) client and MusicBrainz, then a tidy library. A thin wrapper: the flacli command does the work, this adds the two skills, the matcher agent, a health check and a download monitor.",
+  "author": {
+    "name": "h-3303",
+    "url": "https://github.com/h-3303"
+  },
+  "homepage": "https://flacli.vercel.app",
+  "repository": "https://github.com/h-3303/flacli",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "music",
+    "soulseek",
+    "nicotine-plus",
+    "playlists",
+    "spotify",
+    "musicbrainz",
+    "flac",
+    "tags",
+    "music-library",
+    "mcp",
+    "claude-code",
+    "tidal",
+    "deezer",
+    "youtube-music",
+    "beets",
+    "listenbrainz"
+  ]
+}

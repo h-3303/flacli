@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "flacli": {
+      "command": "flacli",
+      "args": ["mcp", "--full"]
+    },
+    "soulseek": {
+      "command": "flacli",
+      "args": ["mcp", "--soulseek"]
+    }
+  }
+}
