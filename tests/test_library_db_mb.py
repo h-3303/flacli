@@ -29,6 +29,35 @@ def test_migrations_are_versioned(tmp_path):
     again.close()
 
 
+def test_missing_columns_are_put_back_on_open(tmp_path):
+    """The version said 3 but a live database lacked migration 3's columns; opening it must repair that."""
+    database = Database(tmp_path / "state.db")
+    database.conn.execute("ALTER TABLE matches DROP COLUMN stalled_since")
+    database.conn.execute("ALTER TABLE library_files DROP COLUMN albumartist")
+    database.close()
+    again = Database(tmp_path / "state.db")
+    assert again.schema_version == 3
+    assert "stalled_since" in {r["name"] for r in again.conn.execute("PRAGMA table_info(matches)")}
+    assert "albumartist" in {r["name"] for r in again.conn.execute("PRAGMA table_info(library_files)")}
+    again.close()
+
+
+def test_failed_migration_leaves_version_and_schema_untouched(tmp_path, monkeypatch):
+    from flacli import db as dbmod
+    database = Database(tmp_path / "state.db")
+    database.close()
+    monkeypatch.setattr(dbmod, "MIGRATIONS", dbmod.MIGRATIONS + ["ALTER TABLE matches ADD COLUMN bogus TEXT; SELECT * FROM nowhere;"])
+
+    with pytest.raises(Exception, match="nowhere"):
+        Database(tmp_path / "state.db")
+
+    monkeypatch.undo()
+    again = Database(tmp_path / "state.db")
+    assert again.schema_version == 3
+    assert "bogus" not in {r["name"] for r in again.conn.execute("PRAGMA table_info(matches)")}
+    again.close()
+
+
 def test_playlist_and_match_state(db):
     tracks = [Track(title="A", artist="X", position=0), Track(title="B", artist="X", position=1, local_path="/music/b.flac")]
     playlist_id = db.add_playlist("P", "csv", tracks, source_ref="p.csv")

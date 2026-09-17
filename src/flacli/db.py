@@ -109,6 +109,13 @@ MIGRATIONS = [
 ]
 
 
+# Columns the migrations after the first add, checked on every open (see Database.migrate).
+ADDED_COLUMNS = {
+    "library_files": {"albumartist": "TEXT", "mb_artist_id": "TEXT"},
+    "matches": {"queue_position": "INTEGER", "stalled_since": "TEXT"},
+}
+
+
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -133,6 +140,10 @@ class Database:
     # Migrations #
 
     def migrate(self):
+        """Apply the pending migrations, each as one transaction with its version bump, so the recorded version
+        and the schema can never disagree; then check the columns the later migrations added and put back any
+        that are missing regardless of what the version says (a live database was once found at version 3
+        without migration 3's columns; every worker then died on "no such column")."""
         self.conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
         row = self.conn.execute("SELECT version FROM schema_version").fetchone()
         current = row["version"] if row else 0
@@ -141,11 +152,29 @@ class Database:
             if number <= current:
                 continue
 
-            with self.conn:
-                self.conn.execute("BEGIN")
-                self.conn.executescript(script)
+            self.conn.execute("BEGIN IMMEDIATE")
+
+            try:
+                for statement in script.split(";"):
+                    if statement.strip():
+                        self.conn.execute(statement)
+
                 self.conn.execute("DELETE FROM schema_version")
                 self.conn.execute("INSERT INTO schema_version VALUES (?)", (number,))
+                self.conn.execute("COMMIT")
+            except BaseException:
+                self.conn.execute("ROLLBACK")
+                raise
+
+        self._repair_columns()
+
+    def _repair_columns(self):
+        for table, columns in ADDED_COLUMNS.items():
+            present = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+
+            for name, kind in columns.items():
+                if name not in present:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
 
     @property
     def schema_version(self) -> int:

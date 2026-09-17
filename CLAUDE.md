@@ -154,7 +154,7 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     the same fake, sidecars, ledger, renditions into a cache with an images table), test_cover.py
                     (Cover Art Archive / Deezer / iTunes through the fakes, cover files, embedding, folder-keyed push),
                     test_claude_plugin.py (manifests validate strictly when `claude` is installed).
-                    199 tests, ~60 s.
+                    201 tests, ~60 s.
 ```
 
 ## Cross-file couplings (each fails quietly)
@@ -229,6 +229,11 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
    user without Nicotine+ running would wait minutes before the failure. Bridge check first.
 4. **`.repo-nav { display:flex }` beat `[hidden]`** (portfolio) — author display rules override the
    UA's `[hidden]`; add an explicit `[hidden] { display: none }`.
+6. **Schema version ahead of the schema.** After the migration adding `queue_position` shipped, the live
+   state.db read version 3 while `matches` still lacked the columns; every worker died on "no such column"
+   and Flaclify showed "flacli could not queue". Cause not pinned down (the migration replayed cleanly on
+   a copy; a long-running old MCP server held the database at the time). migrate() now applies each
+   migration and its version bump in one transaction and re-adds any `ADDED_COLUMNS` missing on open.
 5. **Heredocs and apostrophes.** A `bash -c '…'` wrapping a script that contains `'` ends the string
    mid-script; one such failure still ran the `git commit` half with a truncated message. Write
    scripts and commit messages to the scratchpad and run/`-F` them.
