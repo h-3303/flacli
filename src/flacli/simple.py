@@ -427,8 +427,8 @@ async def avatar_missing(include_all: bool = False) -> dict:
     return await server.avatar_todo(include_all=include_all)
 
 
-async def avatar_fill(limit: int = 10, providers: str | None = None) -> dict:
-    return await server.avatar_fill(limit=limit, **({"providers": providers} if providers else {}))
+async def avatar_fill(limit: int = 10, providers: str | None = None, retry: bool = False) -> dict:
+    return await server.avatar_fill(limit=limit, retry=retry, **({"providers": providers} if providers else {}))
 
 
 async def avatar_set(artist: str, source: str, attribution: str | None = None) -> dict:
@@ -444,8 +444,8 @@ async def cover_missing(include_all: bool = False) -> dict:
     return await server.cover_todo(include_all=include_all)
 
 
-async def cover_fill(limit: int = 10, providers: str | None = None, embed: bool = True) -> dict:
-    return await server.cover_fill(limit=limit, embed=embed, **({"providers": providers} if providers else {}))
+async def cover_fill(limit: int = 10, providers: str | None = None, embed: bool = True, retry: bool = False) -> dict:
+    return await server.cover_fill(limit=limit, embed=embed, retry=retry, **({"providers": providers} if providers else {}))
 
 
 async def cover_set(artist: str, album: str, source: str, attribution: str | None = None, embed: bool = True) -> dict:

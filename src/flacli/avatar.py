@@ -421,11 +421,22 @@ def push(root: Path, entries: list[dict], targets: list[tuple[str, Path]]) -> di
 def _brief(root: Path, entry: dict, ledger: dict) -> dict:
     picture = find_picture(root, entry)
     known = ledger.get(entry["name"]) or {}
-    return {
+    brief = {
         "name": entry["name"], "mbid": entry.get("mbid"), "albums": entry["albums"],
         "picture": str(picture.relative_to(root)) if picture else None,
         "source": known.get("source") if picture else None,
     }
+
+    if picture is None and known.get("tried") is not None:
+        brief["tried"] = known["tried"]
+
+    return brief
+
+
+def tried_before(known: dict | None, mbid: str | None, chosen: list[str]) -> bool:
+    """True when the ledger says these providers (or more) already found nothing for this id."""
+    return bool(known) and known.get("file") is None and known.get("tried") is not None \
+        and known.get("mbid") == mbid and set(chosen) <= set(known.get("providers") or [])
 
 
 def missing(db: Database, root: Path, include_all: bool = False) -> dict:
@@ -454,8 +465,10 @@ def _store(root: Path, entry: dict, found: dict, data: bytes, targets) -> dict:
 
 
 def fill(db: Database, root: Path, pictures: PictureSources, targets: list[tuple[str, Path]], limit: int = 10,
-         providers: str | None = None) -> dict:
-    """A picture for every artist without one, `limit` artists per call, from the first provider that has one."""
+         providers: str | None = None, retry: bool = False) -> dict:
+    """A picture for every artist without one, `limit` artists per call, from the first provider that has one.
+    Artists the chosen providers found nothing for last time are skipped (counted in `tried_before`) unless
+    `retry`, the tags carry a new MusicBrainz id, or a picture has appeared in the artist folder since."""
     root = Path(root).expanduser().resolve()
     chosen = [p.strip() for p in (providers or ",".join(PROVIDERS)).split(",") if p.strip()]
     unknown = [p for p in chosen if p not in PROVIDERS]
@@ -464,7 +477,19 @@ def fill(db: Database, root: Path, pictures: PictureSources, targets: list[tuple
         raise ValueError(f"unknown picture provider {', '.join(unknown)} (choose from {', '.join(PROVIDERS)})")
 
     _, artists = inventory(db, root)
-    todo = [a for a in artists if find_picture(root, a) is None]
+    ledger = load_ledger(root)
+    todo, skipped = [], 0
+
+    for artist in artists:
+        if find_picture(root, artist) is not None:
+            continue
+
+        if not retry and tried_before(ledger.get(artist["name"]), artist.get("mbid"), chosen) \
+                and _folder_picture(root, artist) is None:
+            skipped += 1
+        else:
+            todo.append(artist)
+
     filled, not_found, errors = [], [], []
 
     for entry in todo[:max(0, limit)]:
@@ -475,6 +500,8 @@ def fill(db: Database, root: Path, pictures: PictureSources, targets: list[tuple
             continue
 
         if found is None:
+            _record(root, entry["name"], {"file": None, "source": None, "mbid": entry.get("mbid"),
+                                          "providers": chosen, "tried": notes, "checked": _now()})
             not_found.append({"artist": entry["name"], "mbid": entry.get("mbid"), "tried": notes})
             continue
 
@@ -482,9 +509,10 @@ def fill(db: Database, root: Path, pictures: PictureSources, targets: list[tuple
 
     return {
         "filled": filled, "not_found": not_found, "errors": errors,
-        "remaining": max(0, len(todo) - limit), "providers": chosen,
+        "remaining": max(0, len(todo) - limit), "tried_before": skipped, "providers": chosen,
         "note": "`filled` artists have a picture beside their music and in the player now. `not_found` need one from "
-                "the user (a file or a URL, then `flacli avatar set`). Run again while `remaining` > 0.",
+                "the user (a file or a URL, then `flacli avatar set`); they are remembered and not asked for again "
+                "(`tried_before`) until retry. Run again while `remaining` > 0.",
     }
 
 

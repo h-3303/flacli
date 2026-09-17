@@ -178,7 +178,17 @@ def test_fill_reports_what_it_tried_and_honours_the_provider_list(pictures):
     (home / "Music" / "The Cardigans" / "folder.jpg").write_bytes(jpg(500, 500))
     code, result = run("avatar", "fill", "--providers", "local", "--limit", "1")
     (found,) = result["filled"]
-    assert found["source"] == "local" and found["picture"] == "The Cardigans/artist.jpg" and result["remaining"] == 1
+    assert found["source"] == "local" and found["picture"] == "The Cardigans/artist.jpg" and result["remaining"] == 0
+    assert result["tried_before"] == 1          # Type O Negative: these providers found nothing last time
+
+    # a miss is remembered, so the sources are not asked again until --retry (or a new mbid, or a folder picture)
+    asked = len(web.urls)
+    code, result = run("avatar", "fill", "--providers", "local,musicbrainz")
+    assert (result["filled"], result["not_found"], result["tried_before"], len(web.urls)) == ([], [], 1, asked)
+    code, result = run("avatar", "missing")
+    assert [(e["name"], e["tried"]) for e in result["entries"]] == [("Type O Negative", ["local: nothing", "musicbrainz: nothing"])]
+    code, result = run("avatar", "fill", "--providers", "local,musicbrainz", "--retry")
+    assert [n["artist"] for n in result["not_found"]] == ["Type O Negative"]     # asked again (from the request cache)
 
 
 def test_set_replaces_and_push_repeats(pictures):

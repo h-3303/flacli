@@ -167,6 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
     a = actions.add_parser("fill", help="find one per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer")
     a.add_argument("--limit", type=int, default=10, help="artists to look up per run (default 10)")
     a.add_argument("--providers", help="comma-separated, in order (default local,wikidata,musicbrainz,deezer)")
+    a.add_argument("--retry", action="store_true", help="ask the sources again for artists they had nothing for before")
     a = actions.add_parser("set", help="use one picture for an artist, from a file or a URL")
     a.add_argument("artist")
     a.add_argument("source", help="image file path or http(s) URL")
@@ -183,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--limit", type=int, default=10, help="albums to look up per run (default 10)")
     a.add_argument("--providers", help="comma-separated, in order (default local,coverart,deezer,itunes)")
     a.add_argument("--no-embed", action="store_true", help="write the cover file only; leave the tracks' tags alone")
+    a.add_argument("--retry", action="store_true", help="ask the sources again for albums they had nothing for before")
     a = actions.add_parser("set", help="use one cover for an album, from a file or a URL")
     a.add_argument("artist")
     a.add_argument("album")
@@ -315,7 +317,7 @@ async def dispatch(args) -> dict | str | None:
         if args.action == "missing":
             return await simple.avatar_missing(include_all=args.all)
         if args.action == "fill":
-            return await simple.avatar_fill(limit=args.limit, providers=args.providers)
+            return await simple.avatar_fill(limit=args.limit, providers=args.providers, retry=args.retry)
         if args.action == "set":
             return await simple.avatar_set(args.artist, args.source, attribution=args.attribution)
 
@@ -324,7 +326,7 @@ async def dispatch(args) -> dict | str | None:
         if args.action == "missing":
             return await simple.cover_missing(include_all=args.all)
         if args.action == "fill":
-            return await simple.cover_fill(limit=args.limit, providers=args.providers, embed=not args.no_embed)
+            return await simple.cover_fill(limit=args.limit, providers=args.providers, embed=not args.no_embed, retry=args.retry)
         if args.action == "set":
             return await simple.cover_set(args.artist, args.album, args.source, attribution=args.attribution,
                                           embed=not args.no_embed)

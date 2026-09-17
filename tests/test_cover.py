@@ -12,6 +12,7 @@ from mutagen.flac import FLAC, Picture
 
 from flacli import avatar, cover, server, wiki
 
+from fakempd import FakeMpd
 from test_avatar import PictureBytes, jpg, png                     # noqa: F401 - fixture reuse
 from test_wiki import FakeWeb, home, run                           # noqa: F401 - fixture reuse
 
@@ -148,13 +149,35 @@ def test_fill_reports_what_it_tried_and_honours_the_provider_list(covers):
     assert any("itunes.apple.com" in url and "Gran+Turismo" in url for url in web.urls)
     assert cache_rows(home)[0][2] == ""       # the memo stays until a cover is found
 
-    # --no-embed writes the file only
+    # the miss is remembered: the next run moves on to the album not yet tried, the one after asks nothing
+    code, result = run("cover", "fill", "--providers", "itunes", "--limit", "1")
+    assert result["filled"] == [] and [m["album"] for m in result["not_found"]] == ["World Coming Down"]
+    assert result["tried_before"] == 1 and result["remaining"] == 0
+    asked = len(web.urls)
+    code, result = run("cover", "fill", "--providers", "itunes")
+    assert result["not_found"] == [] and result["tried_before"] == 2 and len(web.urls) == asked
+    code, result = run("cover", "missing")
+    assert [e["tried"] for e in result["entries"]] == [["itunes: nothing"], ["itunes: nothing"]]
+    code, result = run("cover", "fill", "--providers", "itunes", "--retry", "--limit", "1")
+    assert [m["album"] for m in result["not_found"]] == ["Gran Turismo"]     # asked again (from the request cache)
+
+    # --no-embed writes the file only; a provider not tried before is asked
     code, result = run("cover", "fill", "--providers", "coverart", "--no-embed")
     assert code == 0 and [f["album"] for f in result["filled"]] == ["Gran Turismo"] and "tracks" not in result["filled"][0]
     assert pictures_in(home / "Music" / "The Cardigans" / "Gran Turismo" / "01 - Paper Cup.flac") == []
     code, result = run("cover", "missing")
     assert [(e["album"], e["cover"] is not None, e["tracks_without_picture"]) for e in result["entries"]] == [
         ("Gran Turismo", True, 3), ("World Coming Down", False, 1)]
+
+    # an album that has its cover file only gets it embedded: nothing fetched, the ledger and the cache untouched
+    ledger = home / "Music" / ".wiki" / "covers.json"
+    before, asked, rows = ledger.read_text(), len(web.urls), cache_rows(home)
+    code, result = run("cover", "fill", "--providers", "coverart")
+    [gt] = result["filled"]
+    assert gt["source"] == "coverart" and "targets" not in gt and result["tried_before"] == 1
+    assert gt["tracks"] == {"embedded": ["01 - Paper Cup.flac", "02 - Rise & Shine.flac", "03 - Lovefool.flac"],
+                            "already_had_one": 0, "unsupported": []}
+    assert ledger.read_text() == before and len(web.urls) == asked and cache_rows(home) == rows
 
 
 def test_local_pictures_come_first_and_are_never_replaced(covers):
@@ -213,6 +236,22 @@ def test_set_replaces_and_push_repeats(covers):
     assert code == 0 and len(result["pushed"]) == 1
     code, result = run("cover", "push", "Nobody")
     assert code == 1 and "not in the library index" in result["error"]
+
+
+def test_push_keys_follow_mpd_music_directory(covers, monkeypatch):
+    """MPD serves the home and flacli's music_dir is Music inside it: the player keys the art by the MPD uri."""
+    home, web, files = covers
+    player = FakeMpd(home, home / "mpd.sock").start()
+    monkeypatch.setenv("FLACLI_MPD", str(home / "mpd.sock"))
+
+    try:
+        code, result = run("cover", "fill", "--providers", "coverart", "--no-embed")
+        assert code == 0 and [f["album"] for f in result["filled"]] == ["Gran Turismo"]
+        assert [r[0] for r in cache_rows(home)] == ["Music/The Cardigans/Gran Turismo/"] * 2 + ["The Cardigans/Gran Turismo/"] * 2
+        code, result = run("cover", "push")
+        assert code == 0 and result["key_prefix"] == "Music/" and len(result["pushed"]) == 1
+    finally:
+        player.stop()
 
 
 def test_cover_targets_add_flaclify_only_when_its_cache_exists(home, monkeypatch):

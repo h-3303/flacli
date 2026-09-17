@@ -237,6 +237,30 @@ def map_uris(client: Mpd, paths: list[str]) -> tuple[Path, dict[str, str], list[
     return root, inside, outside
 
 
+def library_prefix(path=None) -> str:
+    """The uri prefix MPD puts in front of a path under flacli's music_dir: "" when the music_dir is MPD's
+    music_directory (or MPD is off, unreachable, or refuses `config`), "Music/" when it sits inside MPD's
+    library at Music. Never raises; the players key album art by this uri."""
+    if not candidates():
+        return ""
+
+    try:
+        with Mpd.connect_any() as client:
+            directory = client.music_directory()
+    except MpdError:
+        return ""
+
+    if directory is None:
+        return ""
+
+    try:
+        sub = _resolved(path if path is not None else config.music_dir()).relative_to(_resolved(directory)).as_posix()
+    except ValueError:
+        return ""
+
+    return "" if sub == "." else sub + "/"
+
+
 def _folders(paths: list[str]) -> list[str]:
     folders = set()
 

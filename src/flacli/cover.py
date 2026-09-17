@@ -10,10 +10,14 @@
 
 The cover lives beside the music as <album folder>/cover.jpg (png and webp kept as they came), the name MPD's
 `albumart` command, Navidrome, Jellyfin and most taggers look for; where each came from is kept in
-<music>/.wiki/covers.json. Tracks without a picture of their own get the same image embedded (FLAC, MP3, MP4,
-Ogg); a picture already in a track is never replaced. Flaclify and Euphonica key album art in their cache by
-the album's folder URI and remember a failed lookup as an empty row that stops them ever asking MPD again, so
-the push writes the renditions into the cache the way the player would have, clearing that memo.
+<music>/.wiki/covers.json, and so is every album the sources had nothing for, so fill does not ask again
+(until `retry`, a new MusicBrainz id in the tags, or a picture dropped into the folder). Tracks without a
+picture of their own get the same image embedded (FLAC, MP3, MP4, Ogg); a picture already in a track is never
+replaced, and an album that already has its cover file only gets that file embedded, nothing fetched or
+rewritten. Flaclify and Euphonica key album art in their cache by the album's folder URI (relative to MPD's
+music directory, so mpd.library_prefix() when the music_dir sits inside it) and remember a failed lookup as an
+empty row that stops them ever asking MPD again, so the push writes the renditions into the cache the way the
+player would have, clearing that memo.
 """
 
 import base64
@@ -24,6 +28,7 @@ import urllib.parse
 
 from pathlib import Path
 
+from . import mpd
 from .avatar import PictureSources, inspect_image, push_image
 from .db import Database
 from .wiki import LOOSE_DIR, TARGETS, WikiError, _fold, _now, find_entry, inventory, target_paths
@@ -124,10 +129,20 @@ def _open(path: Path):
 def embedded_picture(path: Path) -> bytes | None:
     """The front cover embedded in one track (the largest picture when there is no front cover), or None."""
     audio = _open(path)
+    return _pictures_of(audio) if audio is not None else None
+
+
+def picture_state(path: Path) -> str:
+    """"picture", "none", or "unreadable" (mutagen cannot open it: nothing to embed into either)."""
+    audio = _open(path)
 
     if audio is None:
-        return None
+        return "unreadable"
 
+    return "picture" if _pictures_of(audio) is not None else "none"
+
+
+def _pictures_of(audio) -> bytes | None:
     pictures: list[tuple[int, int, bytes]] = []      # (is front, size, bytes)
     tags = audio.tags
 
@@ -383,14 +398,15 @@ def cover_targets(setting: str) -> list[tuple[str, Path]]:
     return targets
 
 
-def cache_key(entry: dict) -> str:
-    """The player's key for an album's art: its folder URI, relative to MPD's music directory (the music_dir),
-    with the trailing slash the player keeps."""
-    return entry["folder"].rstrip("/") + "/"
+def cache_key(entry: dict, prefix: str = "") -> str:
+    """The player's key for an album's art: its folder URI relative to MPD's music directory, with the trailing
+    slash the player keeps. `prefix` is mpd.library_prefix(root): "" when the music_dir is MPD's root."""
+    return prefix + entry["folder"].rstrip("/") + "/"
 
 
-def push(root: Path, entries: list[dict], targets: list[tuple[str, Path]]) -> dict:
+def push(root: Path, entries: list[dict], targets: list[tuple[str, Path]], prefix: str | None = None) -> dict:
     root = Path(root).expanduser().resolve()
+    prefix = mpd.library_prefix(root) if prefix is None and targets else (prefix or "")
     pushed, skipped = [], []
 
     for entry in entries:
@@ -402,9 +418,10 @@ def push(root: Path, entries: list[dict], targets: list[tuple[str, Path]]) -> di
             continue
 
         pushed.append({"artist": entry["artist"], "album": entry["title"], "cover": str(cover.relative_to(root)),
-                       "targets": {name: push_image(path, cache_key(entry), cover) for name, path in targets}})
+                       "targets": {name: push_image(path, cache_key(entry, prefix), cover) for name, path in targets}})
 
-    return {"pushed": pushed, "skipped": skipped, "targets": {name: str(path) for name, path in targets}}
+    return {"pushed": pushed, "skipped": skipped, "targets": {name: str(path) for name, path in targets},
+            "key_prefix": prefix}
 
 
 # Operations #
@@ -413,13 +430,28 @@ def _brief(root: Path, entry: dict, ledger: dict) -> dict:
     cover = find_cover(root, entry)
     known = ledger.get(entry["folder"]) or {}
     tracks = album_tracks(root, entry) if entry["folder"] else []
-    without = [t.name for t in tracks if embedded_picture(t) is None]
-    return {
+    without = [t.name for t in tracks if picture_state(t) == "none"]
+    brief = {
         "artist": entry["artist"], "album": entry["title"], "folder": entry["folder"], "mbid": entry.get("mbid"),
         "cover": str(cover.relative_to(root)) if cover else None,
         "source": known.get("source") if cover else None,
         "tracks": len(tracks), "tracks_without_picture": len(without),
     }
+
+    if cover is None and known.get("tried") is not None:
+        brief["tried"] = known["tried"]
+
+    return brief
+
+
+def tried_before(known: dict | None, mbid: str | None, chosen: list[str]) -> bool:
+    """True when the ledger says these providers (or more) already found nothing for this id."""
+    return bool(known) and known.get("file") is None and known.get("tried") is not None \
+        and known.get("mbid") == mbid and set(chosen) <= set(known.get("providers") or [])
+
+
+def _folder_has_picture(root: Path, entry: dict) -> bool:
+    return any((root / entry["folder"] / name).is_file() for name in LOCAL_NAMES)
 
 
 def _wanted(brief: dict) -> bool:
@@ -448,7 +480,17 @@ def missing(db: Database, root: Path, include_all: bool = False) -> dict:
     return result
 
 
-def _store(root: Path, entry: dict, found: dict, data: bytes, targets, embed: bool) -> dict:
+def _embed_existing(root: Path, entry: dict, ledger: dict) -> dict:
+    """The album has its cover file; only some tracks lack a picture. Embed that file, fetch and rewrite nothing."""
+    cover = find_cover(root, entry)
+    data = cover.read_bytes()
+    ext, width, height = inspect_image(data)
+    known = ledger.get(entry["folder"]) or {}
+    return {"artist": entry["artist"], "album": entry["title"], "cover": str(cover.relative_to(root)),
+            "source": known.get("source") or "existing", "tracks": embed_into(root, entry, data, ext, width, height)}
+
+
+def _store(root: Path, entry: dict, found: dict, data: bytes, targets, embed: bool, prefix: str | None = None) -> dict:
     rel = save_cover(root, entry, data, found["ext"])
     record = {"file": rel, "source": found["source"], "url": found.get("url"), "page": found.get("page"),
               "author": found.get("author"), "license": found.get("license"), "width": found["width"],
@@ -460,13 +502,15 @@ def _store(root: Path, entry: dict, found: dict, data: bytes, targets, embed: bo
     if embed:
         result["tracks"] = embed_into(root, entry, data, found["ext"], found["width"], found["height"])
 
-    result["targets"] = push(root, [entry], targets)["pushed"][0]["targets"]
+    result["targets"] = push(root, [entry], targets, prefix)["pushed"][0]["targets"]
     return result
 
 
 def fill(db: Database, root: Path, pictures: CoverSources, targets: list[tuple[str, Path]], limit: int = 10,
-         providers: str | None = None, embed: bool = True) -> dict:
-    """A cover for every album without one (and a picture in every track), `limit` albums per call."""
+         providers: str | None = None, embed: bool = True, retry: bool = False) -> dict:
+    """A cover for every album without one (and a picture in every track), `limit` albums per call. Albums the
+    chosen providers found nothing for last time are skipped (counted in `tried_before`) unless `retry`, the
+    tags carry a new MusicBrainz id, or a picture has appeared in the folder since."""
     root = Path(root).expanduser().resolve()
     chosen = [p.strip() for p in (providers or ",".join(PROVIDERS)).split(",") if p.strip()]
     unknown = [p for p in chosen if p not in PROVIDERS]
@@ -476,7 +520,7 @@ def fill(db: Database, root: Path, pictures: CoverSources, targets: list[tuple[s
 
     albums, _ = inventory(db, root)
     ledger = load_ledger(root)
-    todo, seen = [], set()
+    todo, seen, skipped = [], set(), 0
 
     for album in albums:
         if not album["folder"] or album["folder"] in seen:
@@ -485,29 +529,43 @@ def fill(db: Database, root: Path, pictures: CoverSources, targets: list[tuple[s
         seen.add(album["folder"])
         brief = _brief(root, album, ledger)
 
-        if brief["cover"] is None or (embed and brief["tracks_without_picture"]):
+        if brief["cover"] is not None:
+            if embed and brief["tracks_without_picture"]:
+                todo.append(album)
+        elif not retry and tried_before(ledger.get(album["folder"]), album.get("mbid"), chosen) \
+                and not _folder_has_picture(root, album):
+            skipped += 1
+        else:
             todo.append(album)
 
     filled, not_found, errors = [], [], []
+    prefix = mpd.library_prefix(root) if targets else ""
 
     for entry in todo[:max(0, limit)]:
         try:
+            if find_cover(root, entry) is not None:
+                filled.append(_embed_existing(root, entry, ledger))
+                continue
+
             found, data, notes = find_for(pictures, root, entry, chosen)
-        except WikiError as error:
+        except (WikiError, ValueError) as error:
             errors.append({"artist": entry["artist"], "album": entry["title"], "error": str(error)})
             continue
 
         if found is None:
+            _record(root, entry["folder"], {"file": None, "source": None, "mbid": entry.get("mbid"),
+                                            "providers": chosen, "tried": notes, "checked": _now()})
             not_found.append({"artist": entry["artist"], "album": entry["title"], "mbid": entry.get("mbid"), "tried": notes})
             continue
 
-        filled.append(_store(root, entry, found, data, targets, embed))
+        filled.append(_store(root, entry, found, data, targets, embed, prefix))
 
     return {
         "filled": filled, "not_found": not_found, "errors": errors,
-        "remaining": max(0, len(todo) - limit), "providers": chosen, "embed": embed,
+        "remaining": max(0, len(todo) - limit), "tried_before": skipped, "providers": chosen, "embed": embed,
         "note": "`filled` albums have a cover file beside the music, in every track that had none, and in the player. "
-                "`not_found` need one from the user (a file or a URL, then `flacli cover set`). Run again while `remaining` > 0.",
+                "`not_found` need one from the user (a file or a URL, then `flacli cover set`); they are remembered "
+                "and not asked for again (`tried_before`) until retry. Run again while `remaining` > 0.",
     }
 
 

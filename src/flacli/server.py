@@ -961,15 +961,17 @@ async def avatar_todo(include_all: bool = False) -> dict:
 
 @mcp.tool(annotations=NETWORK)
 @tool_errors
-async def avatar_fill(limit: int = 10, providers: str = "local,wikidata,musicbrainz,deezer") -> dict:
+async def avatar_fill(limit: int = 10, providers: str = "local,wikidata,musicbrainz,deezer", retry: bool = False) -> dict:
     """Find a picture for every artist without one, `limit` artists per call, from the first provider that has one:
     a picture a tagger left in the artist folder, the artist's Wikidata portrait (Wikimedia Commons, with author
     and licence), a MusicBrainz image relation, then Deezer's public artist picture (exact name match only). The
     picture is saved beside the music, its origin in <music>/.wiki/avatars.json, and pushed into the player's
-    cache so it shows at once. `not_found` artists need one from the user: avatar_set. Call again while
-    `remaining` > 0. providers narrows or reorders the sources (e.g. "wikidata,musicbrainz" to leave Deezer out)."""
+    cache so it shows at once. `not_found` artists need one from the user: avatar_set; they are remembered in the
+    same file and not asked for again (`tried_before` counts them) unless retry=True, the tags carry a new
+    MusicBrainz id, or a picture appears in the artist folder. Call again while `remaining` > 0; it only counts
+    artists not yet tried. providers narrows or reorders the sources (e.g. "wikidata,musicbrainz" to leave Deezer out)."""
     await scan_library()
-    return await asyncio.to_thread(_avatar.fill, db(), config.music_dir(), _pictures(), _wiki_targets(), limit, providers)
+    return await asyncio.to_thread(_avatar.fill, db(), config.music_dir(), _pictures(), _wiki_targets(), limit, providers, retry)
 
 
 @mcp.tool(annotations=NETWORK)
@@ -1008,17 +1010,23 @@ async def cover_todo(include_all: bool = False) -> dict:
 
 @mcp.tool(annotations=NETWORK)
 @tool_errors
-async def cover_fill(limit: int = 10, providers: str = "local,coverart,deezer,itunes", embed: bool = True) -> dict:
+async def cover_fill(limit: int = 10, providers: str = "local,coverart,deezer,itunes", embed: bool = True,
+                     retry: bool = False) -> dict:
     """Find a cover for every album without one, `limit` albums per call, from the first provider that has one: a
     picture a tagger left in the album folder or embedded in a track, the Cover Art Archive front (the tagged
-    release, else the release group MusicBrainz finds), Deezer's public album search, the iTunes Search API
-    (exact artist and title match only; the edition suffix is dropped for a second try). The cover is saved beside
-    the music as cover.jpg, embedded in every track that has no picture (never replacing one; embed=False leaves
-    the tags alone), its origin kept in <music>/.wiki/covers.json, and written into the player's cache, clearing
-    its failed-lookup memo, so it shows at once. `not_found` albums need one from the user: cover_set. Call again
-    while `remaining` > 0. providers narrows or reorders the sources."""
+    release, else the release group MusicBrainz finds), Deezer's public album search and the iTunes Search API
+    (those two for an exact artist and title match, the edition suffix dropped for a second try). The cover is
+    saved beside the music as cover.jpg, embedded in every track that has no picture (never replacing one;
+    embed=False leaves the tags alone; each embed rewrites the audio file, which tidy_apply then treats as a
+    recent write for 180 s), its origin kept in <music>/.wiki/covers.json, and written into the player's cache,
+    clearing its failed-lookup memo, so it shows at once. An album that already has its cover file only gets it
+    embedded. `not_found` albums need one from the user: cover_set; they are remembered in the same file and not
+    asked for again (`tried_before` counts them) unless retry=True, the tags carry a new MusicBrainz id, or a
+    picture appears in the folder. Call again while `remaining` > 0; it only counts albums not yet tried.
+    providers narrows or reorders the sources."""
     await scan_library()
-    return await asyncio.to_thread(_cover.fill, db(), config.music_dir(), _covers(), _cover_targets(), limit, providers, embed)
+    return await asyncio.to_thread(_cover.fill, db(), config.music_dir(), _covers(), _cover_targets(), limit, providers,
+                                   embed, retry)
 
 
 @mcp.tool(annotations=NETWORK)
