@@ -12,7 +12,7 @@
     {
       "name": "flacli",
       "description": "The three skills (playlist-sync, music-tidy, wiki-fill), the matcher agent, a session health check and a download monitor over the flacli command, which install.sh puts on PATH. Import playlists from TIDAL, Deezer, YouTube Music or an export file, or just name songs and albums; match them against your local library, fetch the missing tracks through Nicotine+ (Soulseek), file each one as it lands, write an M3U, tidy the library, and fill the empty artist bios and album wikis in Flaclify / Euphonica.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "source": "./plugins/claude-code",
       "homepage": "https://flacli.vercel.app",
       "repository": "https://github.com/h-3303/flacli",

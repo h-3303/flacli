@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "flacli",
   "displayName": "flacli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Playlists and named albums onto disk through your own Nicotine+ (Soulseek) client and MusicBrainz, then a tidy library. A thin wrapper: the flacli command does the work, this adds the three skills (playlist-sync, music-tidy, wiki-fill), the matcher agent, a health check and a download monitor.",
   "author": {
     "name": "h-3303",
