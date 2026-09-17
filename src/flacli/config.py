@@ -22,6 +22,7 @@ SETTINGS = {
     "tidal_redirect_uri": ("FLACLI_TIDAL_REDIRECT_URI", "http://127.0.0.1:43117/callback", str),
     "auto_tidy": ("FLACLI_AUTO_TIDY", True, bool),
     "wiki_targets": ("FLACLI_WIKI_TARGETS", "flaclify", str),
+    "mpd": ("FLACLI_MPD", "", str),
 }
 
 DESCRIPTIONS = {
@@ -32,8 +33,11 @@ DESCRIPTIONS = {
     "tidal_client_id": "Client id of your own app at developer.tidal.com (redirect URI http://127.0.0.1:43117/callback)",
     "tidal_redirect_uri": "Loopback redirect registered on the TIDAL app",
     "auto_tidy": "File each finished download as Artist/Album/NN - Title with normalised tags (never deletes)",
-    "wiki_targets": "Player caches that receive artist bios and album wikis: flaclify, euphonica, or a path to a "
-                    "metadata.sqlite; comma-separated (default: flaclify)",
+    "wiki_targets": "Player caches to write bios, wikis and pictures into directly: flaclify, euphonica, or a path to a "
+                    "metadata.sqlite, comma-separated; empty for none. Flaclify also reads the files beside the music itself "
+                    "(default: flaclify)",
+    "mpd": "The player's MPD, told about new files and saved playlists: empty = auto ($MPD_HOST, the usual local sockets, "
+           "localhost:6600), off, a socket path, or [password@]host[:port]",
 }
 
 
@@ -194,5 +198,11 @@ def auto_tidy() -> bool:
 
 
 def wiki_targets() -> str:
-    """Where `flacli wiki` pushes text: player names or metadata.sqlite paths, comma-separated."""
+    """Player caches `flacli wiki` and `flacli avatar` also write into directly (flaclify, euphonica, or a
+    metadata.sqlite path), comma-separated; empty for none. Flaclify reads the sidecar files itself as well."""
     return get("wiki_targets")
+
+
+def mpd_address() -> str:
+    """The `mpd` setting as written: "" auto, "off", a socket path, or [password@]host[:port]."""
+    return get("mpd")

@@ -47,7 +47,8 @@ flacli config set contact you@example.com     # sent in the MusicBrainz User-Age
 ```
 
 Settings live in `~/.config/flacli/config.toml`; environment variables (`FLACLI_MUSIC_DIR`, `FLACLI_DATA`,
-`FLACLI_CONTACT`, `NICOTINE_MCP_SOCKET`, `FLACLI_TIDAL_CLIENT_ID`, `FLACLI_AUTO_TIDY`, `FLACLI_WIKI_TARGETS`) override them.
+`FLACLI_CONTACT`, `NICOTINE_MCP_SOCKET`, `FLACLI_TIDAL_CLIENT_ID`, `FLACLI_AUTO_TIDY`, `FLACLI_WIKI_TARGETS`,
+`FLACLI_MPD`) override them.
 
 ## Use from a shell
 
@@ -62,6 +63,7 @@ flacli review 2 --doubtful            # the matches below 0.85, with reasons
 flacli approve 2 --tracks 14,15 && flacli skip 2 --tracks 16
 flacli m3u 2
 flacli tidy && flacli tidy --apply    # library clean-up: plan, then apply
+flacli mpd                            # is the player's MPD reachable, and does it serve the same library?
 flacli avatar fill                    # a picture for every artist: Wikidata portrait, MusicBrainz, Deezer
 flacli wiki missing                   # artists and albums whose bio / wiki in the player is empty
 flacli wiki fill                      # Wikipedia's lead paragraph where an article exists, attributed
@@ -69,6 +71,27 @@ flacli wiki set "Artist" "Album" --text-file t.txt --attribution "Written by ...
 ```
 
 `flacli --help` and `flacli <command> --help` document every flag.
+
+### The player
+
+flacli files music; [Flaclify](https://github.com/h-3303/flaclify) (or any MPD client) plays it. The two meet
+through MPD and through files beside the music, nothing else:
+
+- **New files.** Each tidy ends with a scoped `update` of the folders that received files, so a finished download
+  is in the player's library as soon as it is filed. A full `tidy --apply` updates the whole library once.
+- **Playlists.** `flacli m3u` writes the M3U8 and also stores the playlist in MPD under its own name
+  (`playlistclear` + `playlistadd`), so it appears in the player's Playlists view; tracks MPD does not know yet get
+  their folders updated first. `flacli mpd playlist <id>` does the MPD half on its own.
+- **Bios, wikis, pictures.** `flacli wiki` and `flacli avatar` write `Artist/artist.md`, `Artist/Album/wiki.md` and
+  `Artist/artist.jpg` beside the music. Flaclify reads those files itself, before any online provider, and re-reads
+  one whenever it is newer than its cached copy. The direct write into a player's cache (`wiki_targets`, default
+  `flaclify`) is still there for Euphonica and for album covers; set it to nothing once the files alone are enough.
+
+MPD is found through `$MPD_HOST` / `$MPD_PORT`, then the usual local sockets, then `localhost:6600`;
+`flacli config set mpd <socket path | host:port | off>` pins or disables it. Over a local socket flacli reads MPD's
+`music_directory` and skips updates and playlists when it is not the library it files into; over TCP it assumes
+they match. `flacli doctor` and `flacli mpd` report all of this. An unreachable MPD is a `skipped` field in the
+result, never a failure.
 
 ### Artist pictures
 

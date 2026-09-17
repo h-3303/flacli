@@ -13,7 +13,7 @@ import time
 
 from pathlib import Path
 
-from . import __version__, config, jobs, server, wiki
+from . import __version__, config, jobs, mpd, server, wiki
 from .bridge import BridgeClient, BridgeError
 from .connectors import SERVICES, get_connector
 from .db import Database
@@ -93,8 +93,28 @@ async def doctor() -> dict:
                                      "install it with install.sh if it is not listed"}
 
     result["services"] = {s["service"]: s.get("connected", False) for s in (await server.service_status())["services"]}
+    result["mpd"] = await asyncio.to_thread(mpd.probe)
     result["ok"] = result["nicotine"]["reachable"] and result["music_dir_exists"]
     return result
+
+
+# The player's MPD #
+
+async def mpd_status() -> dict:
+    return await asyncio.to_thread(mpd.probe)
+
+
+async def mpd_update(paths: list[str] | None = None) -> dict:
+    """Ask MPD to rescan these files or folders (none: the whole library) and wait for it to finish."""
+    return await asyncio.to_thread(mpd.notify_paths, [str(p) for p in paths] if paths else [str(config.music_dir())], True)
+
+
+async def mpd_playlist(playlist_id: int) -> dict:
+    """Store one flacli playlist in MPD under its name, from the tracks already on disk."""
+    playlist = db().get_playlist(playlist_id)
+    local = [r["local_path"] for r in db().tracks(playlist_id) if r["status"] in ("in_library", "done") and r["local_path"]]
+    result = await asyncio.to_thread(mpd.save_playlist, playlist["name"], local)
+    return {"playlist_id": playlist_id, "name": playlist["name"], "local_tracks": len(local), "mpd": result}
 
 
 # Direct requests #

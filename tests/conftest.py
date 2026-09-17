@@ -20,6 +20,12 @@ def anyio_backend():
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def no_real_mpd(monkeypatch):
+    """Tests never talk to a real MPD: off unless a test points FLACLI_MPD at its own fake server."""
+    monkeypatch.setenv("FLACLI_MPD", "off")
+
+
 @pytest.fixture(scope="session")
 def nicotine():
     """A running headless Nicotine+ core with the bridge plugin installed (not yet enabled)."""

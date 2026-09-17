@@ -119,4 +119,5 @@ variables, so an MCP server entry can carry per-client overrides:
 | `bridge_socket` | `NICOTINE_MCP_SOCKET` | only if you changed the socket in the Nicotine+ plugin settings |
 | `tidal_client_id` | `FLACLI_TIDAL_CLIENT_ID` | your TIDAL app's client id |
 | `auto_tidy` | `FLACLI_AUTO_TIDY` | file each finished download as Artist/Album/NN - Title (default on) |
-| `wiki_targets` | `FLACLI_WIKI_TARGETS` | player caches that receive bios and wikis: `flaclify`, `euphonica`, or a path to a `metadata.sqlite`, comma-separated (default `flaclify`) |
+| `wiki_targets` | `FLACLI_WIKI_TARGETS` | player caches to write bios, wikis and pictures into directly: `flaclify`, `euphonica`, or a path to a `metadata.sqlite`, comma-separated, empty for none. Flaclify also reads the files beside the music itself (default `flaclify`) |
+| `mpd` | `FLACLI_MPD` | the player's MPD, told about new files and saved playlists: empty = auto (`$MPD_HOST`, the usual local sockets, `localhost:6600`), `off`, a socket path, or `[password@]host[:port]` |

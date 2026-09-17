@@ -14,7 +14,7 @@
 
 Requires Nicotine+ 3.3 or newer and uv. The script copies the MCP Bridge plugin into Nicotine+'s plugin folder (native or Flatpak) and runs `uv tool install .` so `flacli` lands on PATH. Then tick "MCP Bridge" in Nicotine+ → Preferences → Plugins and run `flacli doctor`.
 
-Settings: `~/.config/flacli/config.toml` (`flacli config set music_dir ~/Music`), overridden by FLACLI_MUSIC_DIR, FLACLI_DATA, FLACLI_CONTACT, NICOTINE_MCP_SOCKET, FLACLI_TIDAL_CLIENT_ID, FLACLI_AUTO_TIDY.
+Settings: `~/.config/flacli/config.toml` (`flacli config set music_dir ~/Music`), overridden by FLACLI_MUSIC_DIR, FLACLI_DATA, FLACLI_CONTACT, NICOTINE_MCP_SOCKET, FLACLI_TIDAL_CLIENT_ID, FLACLI_AUTO_TIDY, FLACLI_WIKI_TARGETS, FLACLI_MPD.
 
 ## Agent guide
 
@@ -32,7 +32,7 @@ docs/integrations.md in the repository has the configuration for Claude Code (`c
 4. Match: a worker process searches Soulseek per track through the Nicotine+ bridge, scores every result (title, artist, album, duration, format, free slot, queue) and keeps the best few. Three or more missing tracks of one release become an album search; the folder is inspected and its track count checked.
 5. Approve and queue: confident candidates (≥ 0.85) are auto-approved by get and by sync --yes; everything else waits for review. queue shows tracks, MB and users; --yes sends the transfers to Nicotine+.
 6. Sync and tidy: status maps transfers to done/failed, retries from the next candidate, and files each finished track (tags normalised, Artist/Album/NN - Title, cover art following). tidy plans the rest of the library: tag rules, lossy duplicates of FLACs, playlist dumps, moves; a report and a plan first, deletions only by name and after a yes.
-7. M3U in the original order; missing tracks listed, never dropped.
+7. M3U in the original order; missing tracks listed, never dropped. The playlist is also stored in the player's MPD under its own name, and each tidy ends with a scoped MPD update of the folders that received files, so downloads and playlists appear in Flaclify (or any MPD client) without a manual rescan. Bios, wikis and artist pictures are files beside the music (artist.md, wiki.md, artist.jpg) that Flaclify reads itself (wiki_targets still writes them into a player cache as well, for Euphonica). Setting `mpd`: auto, off, a socket path, or host:port.
 
 The Nicotine+ side is a small stdlib-only plugin ("MCP Bridge") listening on a 0600 Unix socket with peer-credential checks; it enforces a search rate limit of 34 searches per 220 seconds because Soulseek bans an account for thirty minutes when exceeded.
 

@@ -137,6 +137,7 @@
           <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>QUEUE.</b> Totals first. <code>--yes</code> only after the user has seen them. Then the transfers go to Nicotine+.</span></div>
           <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>M3U.</b> The playlist in its own order. Tracks still missing are listed, never dropped.</span></div>
           <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>TIDY.</b> Each finished download is filed as <code>Artist/Album/NN - Title</code> on arrival. <code>flacli tidy</code> plans the rest of the library; <code>--apply</code> after your yes.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>PLAYER.</b> Every tidy ends by telling MPD to rescan just the folders that received files, and every M3U is also stored in MPD under its own name. Flaclify shows both without a rescan.</span></div>
         </div>
       </div>
 
@@ -192,8 +193,9 @@ flacli guide                               # hand this to the agent</pre>
         <li><code>flacli queue &lt;id&gt; [--yes]</code><span>totals without the flag; transfers only with it</span></li>
         <li><code>flacli m3u &lt;id&gt;</code><span>the file, in order, and the list of what is still missing</span></li>
         <li><code>flacli tidy [--apply]</code><span>the library put in order; a report and a plan first, writes only with the flag</span></li>
-        <li><code>flacli avatar missing · fill · set</code><span>a picture for every artist in the player: one a tagger left behind, the Wikidata portrait with its licence, a MusicBrainz image, or Deezer's; saved beside the music as <code>artist.jpg</code> and written straight into the player's cache</span></li>
-        <li><code>flacli wiki missing · fill · set</code><span>the empty bio and wiki panels in Flaclify / Euphonica: Wikipedia where an article exists, the agent's own prose from MusicBrainz facts for the rest, each attributed, kept as Markdown beside the music</span></li>
+        <li><code>flacli mpd [update · playlist]</code><span>the player's MPD: is it reachable and serving the same library; a scoped rescan; a playlist stored by name. Done for you after every tidy and M3U</span></li>
+        <li><code>flacli avatar missing · fill · set</code><span>a picture for every artist in the player: one a tagger left behind, the Wikidata portrait with its licence, a MusicBrainz image, or Deezer's; saved beside the music as <code>artist.jpg</code>, where Flaclify finds it</span></li>
+        <li><code>flacli wiki missing · fill · set</code><span>the empty bio and wiki panels in Flaclify / Euphonica: Wikipedia where an article exists, the agent's own prose from MusicBrainz facts for the rest, each attributed, kept as Markdown beside the music, which Flaclify reads before asking anyone online</span></li>
         <li><code>flacli search · download · downloads</code><span>the bridge on its own: raw Soulseek search, a whole folder, the transfer list</span></li>
         <li><code>flacli service · config · doctor</code><span>TIDAL and YouTube Music logins stored 0600 on your disk; settings; the health check that says what to fix</span></li>
       </ul>
@@ -238,6 +240,46 @@ $ flacli status 1
         </div>
       </div>
     </div>
+
+    <div class="two">
+      <div>
+        <div class="dtw-bar-heading dtw-bar-heading--typewriter rot-1">THE PLAYER</div>
+        <p class="dtw-body" style="font-size: 13px; margin-top: 14px">
+          flacli files music; <a href="https://flaclify.vercel.app">Flaclify</a>, an MPD client, plays it. They meet
+          through MPD and through files beside the music, nothing else. A finished download is filed and MPD is asked
+          to rescan that one folder, so the album is in the library before the agent has finished its sentence.
+          <code>flacli m3u</code> writes the M3U8 and stores the same playlist in MPD by name, so it is in the
+          player's Playlists view with the tracks that exist and a list of the ones that do not. Bios, wikis and
+          artist pictures are <code>artist.md</code>, <code>wiki.md</code> and <code>artist.jpg</code> next to the
+          files; Flaclify reads them itself, before any online provider, and again whenever one changes, so the text
+          and the pictures no longer depend on anything being written into the player's own database.
+        </p>
+        <p class="dtw-body" style="font-size: 13px; margin-top: 12px">
+          MPD is found through <code>$MPD_HOST</code>, then the usual local sockets, then <code>localhost:6600</code>;
+          <code>flacli config set mpd</code> pins a socket or host, or turns it off. Over a local socket flacli reads
+          MPD's music directory and stays quiet when it is not the library it files into. An MPD that is not there is a
+          <code>skipped</code> field in the output, never a failure. The next steps, in the player rather than the
+          shell, are on the <a href="https://github.com/h-3303/flaclify/issues?q=label%3Aroadmap">roadmap</a>.
+        </p>
+      </div>
+      <div class="stack">
+        <div class="dtw-plate" style="height: 250px; transform: rotate(-0.6deg)">
+          <div class="dtw-plate__fill dtw-hatch dtw-tone" style="background-color: var(--dtw-grey-2); opacity: 0.9"></div>
+          <div class="dtw-plate__label" style="font-size: 10px; background: var(--dtw-paper); inset: 14px; border: 1px solid var(--dtw-toner)">AGENT ──▶ flacli ──▶ Nicotine+ ──▶ ~/Music
+                         │
+            files land   │  Artist/Album/NN - Title
+                         ▼
+                   MPD  update "Artist/Album"
+                        playlistadd "Road trip"
+                         │
+                         ▼
+                     FLACLIFY
+          reads artist.md · wiki.md · artist.jpg
+          beside the music, before anyone online</div>
+          <div class="dtw-plate__spine"><span>FIG. 2 — WHERE THE TWO MEET</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="dtw-sheet dtw-sheet--black black-band">
@@ -256,7 +298,7 @@ $ flacli status 1
 
     <div class="row" style="margin-top: 26px; flex-wrap: wrap; align-items: center">
       <div class="dtw-torn-scrap dtw-torn-scrap--v1 dtw-xerox" style="transform: rotate(-0.9deg); max-width: 300px">
-        <p class="dtw-typewriter" style="font-size: 11px">Tested against Nicotine+ 3.3.10, 3.3.11 and master. 170 tests: a headless Nicotine+ core in-process, fake Soulseek peers, all three MCP servers over stdio, the CLI end to end through a real detached worker, a synthetic library tidied, the service connectors on recorded fixtures. Nothing touches the network.</p>
+        <p class="dtw-typewriter" style="font-size: 11px">Tested against Nicotine+ 3.3.10, 3.3.11 and master. 187 tests: a headless Nicotine+ core in-process, fake Soulseek peers, all three MCP servers over stdio, the CLI end to end through a real detached worker, a synthetic library tidied, the service connectors on recorded fixtures. Nothing touches the network.</p>
       </div>
       <div class="dtw-pasted-slip dtw-pasted-slip--hand" style="transform: rotate(-1.6deg); font-size: 30px">everything stays on your machine</div>
     </div>

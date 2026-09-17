@@ -73,6 +73,15 @@ src/flacli/
                     relations to Commons, Deezer public search (exact name, never its "/artist//"
                     placeholder), through wiki.Sources' cached JSON fetch; bytes via fetch_bytes.
                     push_avatar() writes into the player's cache itself (see couplings). Pillow.
+  mpd.py            The player's MPD, stdlib protocol client. candidates() from the `mpd` setting ("" auto:
+                    $MPD_HOST/$MPD_PORT, the usual local sockets, localhost:6600; "off"; a socket path;
+                    [password@]host[:port]). notify_paths() = scoped `update` of the folders holding the
+                    given files (whole library above MAX_SCOPED_UPDATES), save_playlist() = playlistclear +
+                    playlistadd in order (missing files: update their folders, wait, add again), probe()
+                    for doctor. uris are relative to MPD's music_directory (`config`, local socket only),
+                    else to music_dir; outside it = skipped. Never raises past its own functions: every
+                    result is a dict, an unreachable MPD is a "skipped" field. Called from server.py
+                    (_tidy_files, tidy_apply, write_m3u) and simple.py (doctor, mpd_*). tests/fakempd.py.
   bsonlite.py       Minimal BSON codec for those documents (serde subset; raises on unknown types).
   GUIDE.md          The agent guide (`flacli guide`). Written for the smallest model that might follow
                     it. Keep the "## Quick reference" heading: --short prints from it to the next "## ".
@@ -152,6 +161,12 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
 - `mcp_simple.py` tool list ↔ `tests/test_worker_e2e.py::test_simple_mcp_server_tool_list` (exact set)
   ↔ the site's "fifteen coarse tools" and README; the full server's count (51 with soulseek) is in
   cli.py's `--full` help, mcp_simple.py's docstring, README and the site.
+- Flaclify reads the sidecars itself (`src/meta_providers/local.rs` there:
+  `<folder_uri>/wiki.md`, `<top folder>/artist.md`, `.wiki/<name>.md`, `artist.{jpg,jpeg,png,webp}`; the
+  naming must match wiki.py's `_artist_sidecar` / `_safe_name` / `_fold`). The direct push below (`wiki_targets`,
+  still default `flaclify`) is what Euphonica and album covers need; text and avatars no longer depend on it.
+- Tests must never reach a real MPD: conftest sets `FLACLI_MPD=off` (autouse); test_mpd.py points it at its
+  fake server on a socket in the temp dir.
 - `wiki.push_entry` ↔ Flaclify's `cache/sqlite.rs` (tables albums/artists, BSON `AlbumMeta` /
   `ArtistMeta` from `meta_providers/models.rs`, keys: album mbid else title+albumartist, artist mbid
   else name; `last_modified` RFC 3339). Serde needs every non-Option field present, so a new

@@ -19,6 +19,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from . import __version__, config
+from . import mpd as _mpd
 from .beets import Beets, BeetsError
 from .bridge import BridgeClient, BridgeError
 from .connectors import SERVICES, ConnectorError, get_connector
@@ -921,7 +922,8 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
 @mcp.tool(annotations=WRITE_LOCAL)
 @tool_errors
 async def write_m3u(playlist_id: int, path: str | None = None, relative_to: str | None = None) -> dict:
-    """Write the playlist as M3U8 in its original order using the local files (in_library and done tracks).
+    """Write the playlist as M3U8 in its original order using the local files (in_library and done tracks), and
+    store it under the same name in the player's MPD (the `mpd` field says how that went) so it shows in Flaclify.
     Tracks not owned yet are listed in the result, never silently dropped. Default path: <music dir>/Playlists/."""
     playlist = db().get_playlist(playlist_id)
     entries = [{"position": r["position"] + 1, "title": r["title"], "artist": r["artist"], "duration_ms": r["duration_ms"],
@@ -933,6 +935,7 @@ async def write_m3u(playlist_id: int, path: str | None = None, relative_to: str 
     result = _write_m3u(target, playlist["name"], entries, relative)
     result["missing_count"] = len(result["missing"])
     result["missing"] = result["missing"][:50]
+    result["mpd"] = await asyncio.to_thread(_mpd.save_playlist, playlist["name"], [e["local_path"] for e in entries if e["local_path"]])
     return result
 
 
@@ -1015,6 +1018,7 @@ async def tidy_apply(music_dir: str | None = None, confirm: bool = False, force:
 
     result = await asyncio.to_thread(lambda: Tidy(root).apply(force=force))
     result["applied"] = True
+    result["mpd"] = await asyncio.to_thread(_mpd.notify_paths, [str(root)])
     return result
 
 
@@ -1040,6 +1044,8 @@ async def _tidy_files(paths, music_dir: Path | None = None) -> dict | None:
     result["reindexed"] = reindex_moved(db(), moves) if moves else 0
     result["moved_to"] = sorted({os.path.relpath(os.path.dirname(new), root) for new in moves.values()})[:50]
     result["auto_tidy"] = config.auto_tidy()
+    landed = {os.path.abspath(old): new for old, new in moves.items()}
+    result["mpd"] = await asyncio.to_thread(_mpd.notify_paths, [landed.get(os.path.abspath(path), path) for path in inside])
     return result
 
 

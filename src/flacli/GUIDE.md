@@ -23,6 +23,7 @@ flacli queue <id>                     totals of what would download; show them t
 flacli queue <id> --yes               queue it (only after the user said yes)
 flacli m3u <id>                       write the playlist file; lists what is still missing
 flacli tidy [--apply]                 library clean-up plan; apply only after the user saw the deletions
+flacli mpd [update|playlist <id>]     the player's MPD: reachable? rescan folders; store a playlist by name
 flacli avatar missing                 artists with no picture yet (the player shows it as the artist's avatar)
 flacli avatar fill                    a picture per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer
 flacli avatar set "Artist" <file|url> use this picture instead (when fill found none, or the user prefers one)
@@ -63,8 +64,8 @@ flacli guide                          this text
 ## Workflow: bios and wikis for the library
 
 The player (Flaclify / Euphonica) shows a bio under each artist and a wiki under each album; most are empty.
-The text lives in a Markdown file beside the music (`Artist/artist.md`, `Artist/Album/wiki.md`) and is pushed
-into the player's cache by `flacli wiki set`.
+The text lives in a Markdown file beside the music (`Artist/artist.md`, `Artist/Album/wiki.md`). Flaclify reads
+those files itself; `flacli wiki set` also writes it into the caches named by `wiki_targets` (Euphonica needs that).
 
 1. `flacli wiki missing` lists what has no text, artists first. Say how many.
 2. `flacli wiki fill` gives every entry that has an English Wikipedia article its lead paragraph, attributed,
@@ -120,3 +121,7 @@ cache so it shows at once.
   the command again.
 - Candidate `confidence` at or above 0.85 is normally safe. Below that, read `why` (title, artist, album, duration
   agreement), `quality` and `queue` before approving.
+- `mpd`: what the player's MPD was told. After a tidy, `updated` lists the folders it was asked to rescan; after
+  `m3u`, `playlist` and `added` say the playlist is stored in MPD and `not_in_db` lists files it could not add.
+  `skipped` with a reason means no MPD was reachable or it serves a different library; the files are still fine.
+  Never retry it in a loop; `flacli mpd` explains, and `flacli config set mpd off` silences it.

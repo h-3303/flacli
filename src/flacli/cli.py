@@ -119,6 +119,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--path", help="output file (default <music dir>/Playlists/<name>.m3u8)")
     p.add_argument("--relative-to", help="write paths relative to this folder")
 
+    p = commands.add_parser("mpd", help="the player's MPD: is it reachable, rescan folders, store a playlist")
+    p.add_argument("action", nargs="?", choices=["status", "update", "playlist"], default="status")
+    p.add_argument("targets", nargs="*", help="update: files or folders (default: the whole library); playlist: the playlist id")
+
     p = commands.add_parser("delete", help="forget a playlist and its match state (files untouched)")
     p.add_argument("playlist_id", type=int)
 
@@ -132,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--new", action="store_true", help="only file newly arrived tracks; never deletes")
     p.add_argument("--paths", nargs="*", help="with --new: specific files to file")
 
-    p = commands.add_parser("wiki", help="artist bios and album wikis: sidecar files in the library, pushed into the player")
+    p = commands.add_parser("wiki", help="artist bios and album wikis: Markdown beside the music, which Flaclify reads (or pushed into Euphonica)")
     actions = p.add_subparsers(dest="action", metavar="action")
     actions.required = True
     a = actions.add_parser("missing", help="artists and albums without text yet (scans first)")
@@ -151,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--force", action="store_true", help="replace existing text")
     a = actions.add_parser("fill", help="Wikipedia text where an article exists; briefs with facts for the rest")
     a.add_argument("--limit", type=int, default=10, help="entries to look up per run (default 10, about four requests each)")
-    a = actions.add_parser("push", help="copy sidecar texts into the player caches again")
+    a = actions.add_parser("push", help="write sidecar texts into the wiki_targets caches again")
     a.add_argument("artist", nargs="?")
     a.add_argument("album", nargs="?")
 
@@ -267,6 +271,16 @@ async def dispatch(args) -> dict | str | None:
         return await simple.cancel(args.playlist_id)
     if command == "m3u":
         return await simple.m3u(args.playlist_id, path=args.path, relative_to=args.relative_to)
+    if command == "mpd":
+        if args.action == "update":
+            return await simple.mpd_update(args.targets or None)
+        if args.action == "playlist":
+            if len(args.targets) != 1 or not args.targets[0].isdigit():
+                raise ValueError("usage: flacli mpd playlist <playlist id>")
+
+            return await simple.mpd_playlist(int(args.targets[0]))
+
+        return await simple.mpd_status()
     if command == "delete":
         return await simple.delete(args.playlist_id)
     if command == "scan":
