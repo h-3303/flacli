@@ -257,13 +257,20 @@ async def status(playlist_id: int | None = None) -> dict:
     """Without an id: every playlist. With one: counts, the job, and the download state (finished transfers are
     filed at the same time)."""
     if playlist_id is None:
-        return await server.list_playlists()
+        listed = await server.list_playlists()
+
+        # The fields a player may rely on, per playlist (see GUIDE.md, "Reading the output").
+        for item in listed["playlists"]:
+            item["mpd_playlist"] = mpd.playlist_name(item["name"])
+            item["job"] = jobs.describe(db().current_job(item["playlist_id"]))
+            item["next"] = _next_step(item["playlist_id"], item["job"], item["counts"])
+
+        return listed
 
     playlist = db().get_playlist(playlist_id)
-    result = {"playlist_id": playlist_id, "name": playlist["name"], "tracks": playlist["track_count"]}
-    job = db().active_job(playlist_id) or db().conn.execute(
-        "SELECT * FROM jobs WHERE playlist_id = ? ORDER BY id DESC LIMIT 1", (playlist_id,)).fetchone()
-    result["job"] = jobs.describe(job)
+    result = {"playlist_id": playlist_id, "name": playlist["name"], "mpd_playlist": mpd.playlist_name(playlist["name"]),
+              "tracks": playlist["track_count"]}
+    result["job"] = jobs.describe(db().current_job(playlist_id))
     queued = db().tracks(playlist_id, statuses=["queued", "downloading"])
 
     if queued:
@@ -280,8 +287,21 @@ async def status(playlist_id: int | None = None) -> dict:
 
     counts = {k: v for k, v in db().status_counts(playlist_id).items() if v}
     result["counts"] = counts
+    result["missing"] = missing_tracks(playlist_id)
     result["next"] = _next_step(playlist_id, result["job"], counts)
     return result
+
+
+ON_DISK = ("done", "in_library")
+
+
+def missing_tracks(playlist_id: int) -> list[dict]:
+    """The tracks not on disk, in playlist order: what a player shows as ghost rows in the stored playlist."""
+    return [
+        {"track_id": row["id"], "position": row["position"] + 1, "artist": row["artist"], "title": row["title"],
+         "album": row["album"] or None, "status": row["status"]}
+        for row in db().tracks(playlist_id) if row["status"] not in ON_DISK
+    ]
 
 
 def _next_step(playlist_id, job, counts) -> str:

@@ -406,6 +406,11 @@ class Database:
             (playlist_id,),
         ).fetchone()
 
+    def current_job(self, playlist_id):
+        """The running job, else the most recent one; what the status commands describe."""
+        return self.active_job(playlist_id) or self.conn.execute(
+            "SELECT * FROM jobs WHERE playlist_id = ? ORDER BY id DESC LIMIT 1", (playlist_id,)).fetchone()
+
     def interrupt_running_jobs(self):
         self.conn.execute("UPDATE jobs SET status = 'interrupted', updated_at = ? WHERE status IN ('running', 'waiting')",
                           (utcnow(),))

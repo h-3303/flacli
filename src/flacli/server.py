@@ -281,9 +281,7 @@ async def list_playlists() -> dict:
 async def playlist_status(playlist_id: int) -> dict:
     """Counts by match status plus the active or last matching job (progress, rate-limit waits)."""
     playlist = db().get_playlist(playlist_id)
-    job = db().active_job(playlist_id) or db().conn.execute(
-        "SELECT * FROM jobs WHERE playlist_id = ? ORDER BY id DESC LIMIT 1", (playlist_id,)
-    ).fetchone()
+    job = db().current_job(playlist_id)
     result = {
         "playlist_id": playlist_id, "name": playlist["name"], "tracks": playlist["track_count"],
         "counts": {k: v for k, v in db().status_counts(playlist_id).items() if v},

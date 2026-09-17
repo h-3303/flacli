@@ -105,10 +105,18 @@ def test_import_status_scan_m3u_offline(home):
 
     code, status = run("status")
     assert code == 0 and status["playlists"][0]["playlist_id"] == playlist_id
+    # The player contract: these keys are what Flaclify's incoming indicator reads. Renaming one fails here first.
+    listed = status["playlists"][0]
+    assert set(listed) >= {"playlist_id", "name", "mpd_playlist", "counts", "job", "next"}
+    assert listed["job"] is None and listed["mpd_playlist"] == listed["name"] and "flacli sync" in listed["next"]
 
     code, one = run("status", str(playlist_id))
     assert code == 0 and one["counts"] == {"pending": entry["tracks"]} and one["job"] is None
-    assert "flacli sync" in one["next"]
+    assert "flacli sync" in one["next"] and one["mpd_playlist"] == one["name"]
+    # ...and these are what its ghost rows read: every track not on disk, in order.
+    assert [m["position"] for m in one["missing"]] == list(range(1, entry["tracks"] + 1))
+    assert set(one["missing"][0]) == {"track_id", "position", "artist", "title", "album", "status"}
+    assert {m["status"] for m in one["missing"]} == {"pending"}
 
     code, review = run("review", str(playlist_id), "--status", "pending", "--limit", "2")
     assert code == 0 and review["total"] == entry["tracks"] and len(review["tracks"]) == 2

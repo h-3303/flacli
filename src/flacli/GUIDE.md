@@ -153,3 +153,7 @@ player's cache so it shows at once.
   `m3u`, `playlist` and `added` say the playlist is stored in MPD and `not_in_db` lists files it could not add.
   `skipped` with a reason means no MPD was reachable or it serves a different library; the files are still fine.
   Never retry it in a loop; `flacli mpd` explains, and `flacli config set mpd off` silences it.
+- For players (Flaclify reads these; they stay stable): `status` lists every playlist with `playlist_id`, `name`,
+  `mpd_playlist` (the name it is stored under in MPD), `counts`, `job` (`status`, `phase`, or null) and `next`.
+  `status <id>` adds `missing`: the tracks not on disk, in playlist order, each with `position` (1-based), `artist`,
+  `title`, `album` and `status`. `flacli mpd` reports `same_library`; `flacli config` gives `music_dir`.
