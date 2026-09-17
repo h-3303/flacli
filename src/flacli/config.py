@@ -21,6 +21,7 @@ SETTINGS = {
     "tidal_client_id": ("FLACLI_TIDAL_CLIENT_ID", "", str),
     "tidal_redirect_uri": ("FLACLI_TIDAL_REDIRECT_URI", "http://127.0.0.1:43117/callback", str),
     "auto_tidy": ("FLACLI_AUTO_TIDY", True, bool),
+    "wiki_targets": ("FLACLI_WIKI_TARGETS", "flaclify", str),
 }
 
 DESCRIPTIONS = {
@@ -31,6 +32,8 @@ DESCRIPTIONS = {
     "tidal_client_id": "Client id of your own app at developer.tidal.com (redirect URI http://127.0.0.1:43117/callback)",
     "tidal_redirect_uri": "Loopback redirect registered on the TIDAL app",
     "auto_tidy": "File each finished download as Artist/Album/NN - Title with normalised tags (never deletes)",
+    "wiki_targets": "Player caches that receive artist bios and album wikis: flaclify, euphonica, or a path to a "
+                    "metadata.sqlite; comma-separated (default: flaclify)",
 }
 
 
@@ -188,3 +191,8 @@ def tidal_redirect_uri() -> str:
 def auto_tidy() -> bool:
     """Tidy newly downloaded tracks (tags + Artist/Album/NN - Title) as soon as a sync sees them finish."""
     return get("auto_tidy")
+
+
+def wiki_targets() -> str:
+    """Where `flacli wiki` pushes text: player names or metadata.sqlite paths, comma-separated."""
+    return get("wiki_targets")

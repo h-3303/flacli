@@ -19,9 +19,10 @@ from .bridge import BridgeError
 from .connectors import ConnectorError
 from .musicbrainz import MusicBrainzError
 from .tidy import TidyError
+from .wiki import WikiError
 
 EXPECTED_ERRORS = (LookupError, ValueError, FileNotFoundError, PermissionError, BridgeError, MusicBrainzError, TidyError,
-                   ConnectorError, OSError, ToolError)
+                   ConnectorError, OSError, ToolError, WikiError)
 
 
 def _ids(text: str) -> list[int]:
@@ -131,6 +132,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--new", action="store_true", help="only file newly arrived tracks; never deletes")
     p.add_argument("--paths", nargs="*", help="with --new: specific files to file")
 
+    p = commands.add_parser("wiki", help="artist bios and album wikis: sidecar files in the library, pushed into the player")
+    actions = p.add_subparsers(dest="action", metavar="action")
+    actions.required = True
+    a = actions.add_parser("missing", help="artists and albums without text yet (scans first)")
+    a.add_argument("--all", action="store_true", help="every artist and album, with text state")
+    a = actions.add_parser("sources", help="facts and links for one artist or album (MusicBrainz, Wikidata, Wikipedia)")
+    a.add_argument("artist")
+    a.add_argument("album", nargs="?")
+    a = actions.add_parser("set", help="write the text for one artist or album, or many from a JSON list")
+    a.add_argument("artist", nargs="?")
+    a.add_argument("album", nargs="?")
+    a.add_argument("--text", help="the text itself")
+    a.add_argument("--text-file", help="file holding the text (- for stdin)")
+    a.add_argument("--attribution", help="what the text was drawn from; shown under it (required)")
+    a.add_argument("--url", help="'read more' link")
+    a.add_argument("--json", dest="json_file", help='a JSON list of {"artist", "album"?, "content", "attribution", "url"?} (- for stdin)')
+    a.add_argument("--force", action="store_true", help="replace existing text")
+    a = actions.add_parser("fill", help="Wikipedia text where an article exists; briefs with facts for the rest")
+    a.add_argument("--limit", type=int, default=10, help="entries to look up per run (default 10, about four requests each)")
+    a = actions.add_parser("push", help="copy sidecar texts into the player caches again")
+    a.add_argument("artist", nargs="?")
+    a.add_argument("album", nargs="?")
+
     p = commands.add_parser("service", help="streaming services: status, connect, disconnect, playlists")
     p.add_argument("action", choices=["status", "connect", "disconnect", "playlists"])
     p.add_argument("name", nargs="?", choices=["tidal", "deezer", "youtube-music"])
@@ -154,7 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=100)
 
     p = commands.add_parser("mcp", help="run an MCP server over stdio (default: the simple one for small models)")
-    p.add_argument("--full", action="store_true", help="every fine-grained tool (43); for capable models")
+    p.add_argument("--full", action="store_true", help="every fine-grained tool (47); for capable models")
     p.add_argument("--soulseek", action="store_true", help="only the raw Nicotine+ tools")
 
     return parser
@@ -237,6 +261,8 @@ async def dispatch(args) -> dict | str | None:
             return await simple.tidy_new(paths=args.paths or None, music_dir=args.music_dir)
 
         return await simple.tidy(apply=args.apply, force=args.force, music_dir=args.music_dir)
+    if command == "wiki":
+        return await _wiki(args)
     if command == "service":
         headers_raw = None
 
@@ -253,6 +279,51 @@ async def dispatch(args) -> dict | str | None:
         return await simple.downloads(status_name=args.status, limit=args.limit)
 
     raise ValueError(f"unknown command {command}")
+
+
+def _read_text(source: str) -> str:
+    if source == "-":
+        return sys.stdin.read()
+
+    with open(source, encoding="utf-8") as handle:
+        return handle.read()
+
+
+async def _wiki(args) -> dict:
+    if args.action == "missing":
+        return await simple.wiki_missing(include_all=args.all)
+    if args.action == "sources":
+        return await simple.wiki_sources(args.artist, args.album)
+    if args.action == "fill":
+        return await simple.wiki_fill(limit=args.limit)
+    if args.action == "push":
+        return await simple.wiki_push(args.artist, args.album)
+
+    if args.json_file:
+        items = json.loads(_read_text(args.json_file))
+
+        if not isinstance(items, list):
+            raise ValueError("--json expects a list of objects")
+
+        results = []
+
+        for item in items:
+            try:
+                results.append(await simple.wiki_set(item["artist"], item["content"], item.get("attribution", ""),
+                                                     album=item.get("album"), url=item.get("url"), force=args.force))
+            except (KeyError, LookupError, ValueError) as error:
+                results.append({"entry": f'{item.get("artist")} - {item.get("album")}' if item.get("album") else item.get("artist"),
+                                "error": f"missing field {error}" if isinstance(error, KeyError) else str(error)})
+
+        return {"written": [r for r in results if "error" not in r], "errors": [r for r in results if "error" in r]}
+
+    if not args.artist:
+        raise ValueError("usage: flacli wiki set <artist> [album] --text-file f --attribution '...'  (or --json list.json)")
+    if not args.text and not args.text_file:
+        raise ValueError("give --text or --text-file (- for stdin)")
+
+    content = args.text if args.text else _read_text(args.text_file)
+    return await simple.wiki_set(args.artist, content, args.attribution or "", album=args.album, url=args.url, force=args.force)
 
 
 def run_mcp(args):

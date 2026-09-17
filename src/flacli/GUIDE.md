@@ -24,6 +24,10 @@ flacli queue <id> --yes               queue it (only after the user said yes)
 flacli m3u <id>                       write the playlist file; lists what is still missing
 flacli tidy [--apply]                 library clean-up plan; apply only after the user saw the deletions
 flacli search "query"                 raw Soulseek search when the matcher found nothing
+flacli wiki missing                   artists and albums with no bio / wiki text yet
+flacli wiki fill                      Wikipedia text where an article exists; briefs with facts for the rest
+flacli wiki sources "Artist" ["Album"]  MusicBrainz facts and links for one entry, to write from
+flacli wiki set "Artist" ["Album"] --text-file t.txt --attribution "..."   store the text (pushed to the player)
 flacli config set music_dir ~/Music   settings live in ~/.config/flacli/config.toml
 flacli guide                          this text
 ```
@@ -52,6 +56,28 @@ flacli guide                          this text
    `flacli sync ... --yes` is only for when the user asked up front for everything confident to be fetched.
 4. `flacli review <id> --doubtful` for the rest; approve or skip; queue again.
 5. `flacli status <id>` later for the downloads, then `flacli m3u <id>`. Tell the user which tracks are missing.
+
+## Workflow: bios and wikis for the library
+
+The player (Flaclify / Euphonica) shows a bio under each artist and a wiki under each album; most are empty.
+The text lives in a Markdown file beside the music (`Artist/artist.md`, `Artist/Album/wiki.md`) and is pushed
+into the player's cache by `flacli wiki set`.
+
+1. `flacli wiki missing` lists what has no text, artists first. Say how many.
+2. `flacli wiki fill` gives every entry that has an English Wikipedia article its lead paragraph, attributed,
+   ten entries per run (about four web requests each, one per second). Run it again while `remaining` > 0.
+3. Everything in `to_write` is yours. Each entry comes with MusicBrainz facts (type, dates, area, labels, tags,
+   annotation) and outbound links. Write from those facts and nothing else; if the facts are thin, say less.
+   Use `flacli wiki sources "Artist" "Album"` to look one entry up on its own.
+4. Store each text: `flacli wiki set "Artist" "Album" --text-file t.txt --attribution "Written by <you> from
+   MusicBrainz and Discogs, 2026-09-17"`, or many at once with `--json list.json`. Existing text is kept unless
+   `--force`.
+
+How to write: plain prose, no markup, no headings. An album gets one paragraph (60 to 120 words): what it is,
+when and where it came out, who made it, what it sounds like if a source says so. An artist gets two: who
+they are and where from, then what they have made. Release level, not track by track. State facts; no
+praise, no "iconic", no "seminal". The attribution is shown under the text: name the sources, and yourself
+if you wrote it.
 
 ## Rules
 

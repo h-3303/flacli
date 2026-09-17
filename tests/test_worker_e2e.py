@@ -95,7 +95,8 @@ async def test_simple_mcp_server_tool_list(tmp_path):
             await session.initialize()
             tools = {tool.name for tool in (await session.list_tools()).tools}
             assert tools == {"doctor", "get_music", "sync_playlist", "status", "review_candidates", "approve_tracks",
-                             "skip_tracks", "queue_downloads", "write_m3u", "tidy_library", "cancel_job"}
+                             "skip_tracks", "queue_downloads", "write_m3u", "tidy_library", "cancel_job",
+                             "wiki_todo", "wiki_fill", "wiki_sources", "wiki_write"}
 
             result = await session.call_tool("doctor", {})
             report = result.structured_content or json.loads(result.content[0].text)

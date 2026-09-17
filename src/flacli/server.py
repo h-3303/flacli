@@ -34,6 +34,8 @@ from .musicbrainz import MusicBrainzClient, MusicBrainzError
 from .requester import expand, parse_items
 from .tidy import Tidy, TidyError
 from .troi_resolver import Troi, TroiError
+from . import wiki as _wiki
+from .wiki import WikiError
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 WRITE_LOCAL = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
@@ -95,7 +97,7 @@ def tool_errors(function):
         try:
             return await function(*args, **kwargs)
         except (LookupError, ValueError, FileNotFoundError, BridgeError, MusicBrainzError, PermissionError, TidyError,
-                ConnectorError, BeetsError, TroiError) as error:
+                ConnectorError, BeetsError, TroiError, WikiError) as error:
             raise ToolError(str(error)) from None
 
     return wrapper
@@ -523,6 +525,59 @@ async def scan_library(music_dir: str | None = None, rescan: bool = False) -> di
 
 def scan_library_sync(root, rescan, collect_new=False):
     return _scan_library(db(), root, rescan=rescan, collect_new=collect_new)
+
+
+# Wikis: artist bios and album wikis as sidecar files, pushed into the player's cache #
+
+def _wiki_sources() -> _wiki.Sources:
+    return _wiki.Sources(db(), config.user_agent(), fetch=State.mb_fetch, **({"sleep": State.mb_sleep} if State.mb_sleep else {}))
+
+
+def _wiki_targets():
+    return _wiki.target_paths(config.wiki_targets())
+
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def wiki_todo(include_all: bool = False) -> dict:
+    """Artists and albums in the library that have no bio / wiki text yet, with what a writer needs (tracks, year,
+    MusicBrainz ids). Runs an incremental scan first. Then wiki_fill; write the rest with wiki_sources + wiki_write."""
+    await scan_library()
+    return await asyncio.to_thread(_wiki.missing, db(), config.music_dir(), include_all)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def wiki_fill(limit: int = 10) -> dict:
+    """Give every entry without text its English Wikipedia lead paragraph when MusicBrainz links one (attributed,
+    CC BY-SA), `limit` entries per call. The rest come back in `to_write` with MusicBrainz facts and links: write
+    those yourself, from the facts only, and store each with wiki_write. Call again while `remaining` > 0."""
+    await scan_library()
+    return await asyncio.to_thread(_wiki.fill, db(), config.music_dir(), _wiki_sources(), _wiki_targets(), limit)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def wiki_sources(artist: str, album: str | None = None) -> dict:
+    """Facts and links for one artist (album=None) or album: MusicBrainz type, dates, area, labels, tags, annotation,
+    outbound links (Wikidata, Discogs, Bandcamp, homepage), and the Wikipedia lead when there is an article."""
+    await scan_library()
+    albums, artists = await asyncio.to_thread(_wiki.inventory, db(), config.music_dir())
+    entry = _wiki.find_entry(albums, artists, artist, album)
+    return await asyncio.to_thread(_wiki.sources_for, _wiki_sources(), entry)
+
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def wiki_write(artist: str, content: str, attribution: str, album: str | None = None, url: str | None = None,
+                     force: bool = False) -> dict:
+    """Store the text for an artist (album=None) or an album: written to a sidecar file beside the music and pushed
+    into the player's cache. Plain text, no markup; one paragraph for an album, two for an artist; only what the
+    sources support. attribution is shown under the text: name the sources and, if you wrote it, yourself
+    (e.g. "Written by Claude from MusicBrainz and Discogs, 2026-09-17"). force replaces existing text."""
+    await scan_library()
+    return await asyncio.to_thread(_wiki.set_text, db(), config.music_dir(), artist, album, content, attribution, url,
+                                   _wiki_targets(), force)
 
 
 @mcp.tool(annotations=WRITE_LOCAL)

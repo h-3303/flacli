@@ -27,19 +27,28 @@ def _lucene_escape(text: str) -> str:
     return "".join("\\" + c if c in '+-&|!(){}[]^"~*?:\\/' else c for c in text)
 
 
-def default_fetch(url: str, user_agent: str) -> dict:
+BUSY_BACKOFF_S = (2, 4, 8)      # MusicBrainz answers 503 when busy or rate limited; wait and try again, then give up
+
+
+def default_fetch(url: str, user_agent: str, sleep=time.sleep) -> dict:
     request = urllib.request.Request(url, headers={"User-Agent": user_agent, "Accept": "application/json"})
 
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        if error.code == 404:
-            return {}
+    for attempt, pause in enumerate(BUSY_BACKOFF_S + (None,)):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return {}
 
-        raise MusicBrainzError(f"MusicBrainz returned HTTP {error.code} for {url}") from None
-    except (urllib.error.URLError, TimeoutError) as error:
-        raise MusicBrainzError(f"MusicBrainz unreachable: {error}") from None
+            if error.code in (503, 429) and pause is not None:
+                sleep(pause)
+                continue
+
+            raise MusicBrainzError(f"MusicBrainz returned HTTP {error.code} for {url}" +
+                                   (f" after {attempt} retries" if attempt else "")) from None
+        except (urllib.error.URLError, TimeoutError) as error:
+            raise MusicBrainzError(f"MusicBrainz unreachable: {error}") from None
 
 
 class MusicBrainzClient:
@@ -73,6 +82,11 @@ class MusicBrainzClient:
         self._last_request = time.monotonic()
         self.requests_made += 1
         data = self._fetch(url, self.user_agent)
+
+        if isinstance(data, dict) and data.get("error") and len(data) <= 2:
+            # a "web server is currently busy" body can arrive with a 200; never cache it
+            raise MusicBrainzError(f"MusicBrainz: {data['error']}")
+
         self.db.cache_put(url, data)
         return data
 

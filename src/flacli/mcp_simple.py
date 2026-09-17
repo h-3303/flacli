@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The simple MCP server: ten coarse tools, each one whole step, for small or local models.
+"""The simple MCP server: fifteen coarse tools, each one whole step, for small or local models.
 
-`flacli mcp` runs it over stdio. Capable models can use `flacli mcp --full` (43 fine-grained tools) instead.
+`flacli mcp` runs it over stdio. Capable models can use `flacli mcp --full` (47 fine-grained tools) instead.
 """
 
 import functools
@@ -15,6 +15,7 @@ from .bridge import BridgeError
 from .connectors import ConnectorError
 from .musicbrainz import MusicBrainzError
 from .tidy import TidyError
+from .wiki import WikiError
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 LOCAL = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
@@ -30,7 +31,8 @@ mcp = MCPServer(
         "the user, and queue_downloads(playlist_id, yes=True) only after they agree. status() also follows the downloads "
         "and files finished tracks. review_candidates / approve_tracks / skip_tracks handle doubtful matches. write_m3u "
         "writes the playlist file. tidy_library(apply=False) plans a library clean-up; apply=True only after the user has "
-        "seen the deletions. doctor() when anything fails."
+        "seen the deletions. wiki_todo / wiki_fill / wiki_sources / wiki_write give artists and albums the bio and "
+        "wiki text the player shows. doctor() when anything fails."
     ),
 )
 
@@ -41,7 +43,7 @@ def tool_errors(function):
         try:
             return await function(*args, **kwargs)
         except (LookupError, ValueError, FileNotFoundError, PermissionError, BridgeError, MusicBrainzError, TidyError,
-                ConnectorError, OSError) as error:
+                ConnectorError, OSError, WikiError) as error:
             raise ToolError(str(error)) from None
 
     return wrapper
@@ -136,6 +138,42 @@ async def tidy_library(apply: bool = False, force: bool = False) -> dict:
 async def cancel_job(playlist_id: int) -> dict:
     """Stop the running matching job of a playlist."""
     return await simple.cancel(playlist_id)
+
+
+@mcp.tool(annotations=LOCAL)
+@tool_errors
+async def wiki_todo(include_all: bool = False) -> dict:
+    """Artists and albums in the library that have no bio / wiki text yet, with what a writer needs (tracks, year,
+    MusicBrainz ids). Start here, then wiki_fill; write the rest yourself with wiki_sources + wiki_write."""
+    return await simple.wiki_missing(include_all=include_all)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def wiki_fill(limit: int = 10) -> dict:
+    """Give every entry without text its English Wikipedia lead paragraph when MusicBrainz links one (attributed,
+    CC BY-SA), `limit` entries per call. The rest come back in `to_write` with MusicBrainz facts and links: write
+    those yourself, from the facts only, and store each with wiki_write. Call again while `remaining` > 0."""
+    return await simple.wiki_fill(limit=limit)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def wiki_sources(artist: str, album: str | None = None) -> dict:
+    """Facts and links for one artist (album=None) or album: MusicBrainz type, dates, area, labels, tags, annotation,
+    outbound links (Wikidata, Discogs, Bandcamp, homepage), and the Wikipedia lead when there is an article."""
+    return await simple.wiki_sources(artist, album)
+
+
+@mcp.tool(annotations=LOCAL)
+@tool_errors
+async def wiki_write(artist: str, content: str, attribution: str, album: str | None = None, url: str | None = None,
+                     force: bool = False) -> dict:
+    """Store the text for an artist (album=None) or an album: written to a sidecar file beside the music and pushed
+    into the player's cache. Plain text, no markup; one paragraph for an album, two for an artist; only what the
+    sources support. attribution is shown under the text: name the sources and, if you wrote it, yourself
+    (e.g. "Written by Claude from MusicBrainz and Discogs, 2026-09-17"). force replaces existing text."""
+    return await simple.wiki_set(artist, content, attribution, album=album, url=url, force=force)
 
 
 def main():

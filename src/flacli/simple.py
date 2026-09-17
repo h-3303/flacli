@@ -13,7 +13,7 @@ import time
 
 from pathlib import Path
 
-from . import __version__, config, jobs, server
+from . import __version__, config, jobs, server, wiki
 from .bridge import BridgeClient, BridgeError
 from .connectors import SERVICES, get_connector
 from .db import Database
@@ -366,6 +366,48 @@ async def delete(playlist_id: int) -> dict:
 
 async def scan(rescan: bool = False) -> dict:
     return await server.scan_library(rescan=rescan)
+
+
+# Wikis #
+
+def _wiki_sources() -> wiki.Sources:
+    return wiki.Sources(db(), config.user_agent(), fetch=server.State.mb_fetch, **({"sleep": server.State.mb_sleep} if server.State.mb_sleep else {}))
+
+
+async def wiki_missing(include_all: bool = False) -> dict:
+    """Artists and albums without a bio / wiki yet (after an incremental scan)."""
+    await server.scan_library()
+    return await asyncio.to_thread(wiki.missing, db(), config.music_dir(), include_all)
+
+
+async def wiki_sources(artist: str, album: str | None = None) -> dict:
+    """Facts and links for one artist or album: MusicBrainz, Wikidata, the Wikipedia lead when there is one."""
+    await server.scan_library()
+    albums, artists = await asyncio.to_thread(wiki.inventory, db(), config.music_dir())
+    entry = wiki.find_entry(albums, artists, artist, album)
+    return await asyncio.to_thread(wiki.sources_for, _wiki_sources(), entry)
+
+
+async def wiki_set(artist: str, content: str, attribution: str, album: str | None = None, url: str | None = None,
+                   force: bool = False) -> dict:
+    """Write the text to its sidecar file and push it into the configured player caches."""
+    await server.scan_library()
+    return await asyncio.to_thread(wiki.set_text, db(), config.music_dir(), artist, album, content, attribution, url,
+                                   wiki.target_paths(config.wiki_targets()), force)
+
+
+async def wiki_fill(limit: int = 10) -> dict:
+    """Wikipedia text for entries that have an article; briefs with facts for the rest."""
+    await server.scan_library()
+    return await asyncio.to_thread(wiki.fill, db(), config.music_dir(), _wiki_sources(), wiki.target_paths(config.wiki_targets()), limit)
+
+
+async def wiki_push(artist: str | None = None, album: str | None = None) -> dict:
+    """Copy sidecar texts into the player caches again (after a cache wipe, or a new target)."""
+    await server.scan_library()
+    albums, artists = await asyncio.to_thread(wiki.inventory, db(), config.music_dir())
+    entries = [wiki.find_entry(albums, artists, artist, album)] if artist else artists + albums
+    return await asyncio.to_thread(wiki.push, config.music_dir(), entries, wiki.target_paths(config.wiki_targets()))
 
 
 async def tidy(apply: bool = False, force: bool = False, music_dir: str | None = None) -> dict:
