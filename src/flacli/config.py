@@ -34,7 +34,8 @@ DESCRIPTIONS = {
     "tidal_redirect_uri": "Loopback redirect registered on the TIDAL app",
     "auto_tidy": "File each finished download as Artist/Album/NN - Title with normalised tags (never deletes)",
     "wiki_targets": "Player caches to write bios, wikis and pictures into directly: flaclify, euphonica, or a path to a "
-                    "metadata.sqlite, comma-separated; empty for none. Flaclify also reads the files beside the music itself "
+                    "metadata.sqlite, comma-separated; empty for none. Flaclify also reads the files beside the music itself. "
+                    "Album covers go into Flaclify's cache whenever it exists regardless, the only way it takes them "
                     "(default: flaclify)",
     "mpd": "The player's MPD, told about new files and saved playlists: empty = auto ($MPD_HOST, the usual local sockets, "
            "localhost:6600), off, a socket path, or [password@]host[:port]",
@@ -198,8 +199,10 @@ def auto_tidy() -> bool:
 
 
 def wiki_targets() -> str:
-    """Player caches `flacli wiki` and `flacli avatar` also write into directly (flaclify, euphonica, or a
-    metadata.sqlite path), comma-separated; empty for none. Flaclify reads the sidecar files itself as well."""
+    """Player caches `flacli wiki`, `flacli avatar` and `flacli cover` also write into directly (flaclify, euphonica,
+    or a metadata.sqlite path), comma-separated; empty for none of the texts and artist pictures. Flaclify reads those
+    sidecar files itself as well, but takes album covers only from its cache, so cover.cover_targets() adds that
+    cache whenever it exists, whatever this says."""
     return get("wiki_targets")
 
 

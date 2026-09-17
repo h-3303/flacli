@@ -225,6 +225,7 @@ async def test_library_server_over_stdio(bridge, tmp_path):
         assert {"import_playlist_file", "resolve_playlist", "scan_library", "diff_library", "match_playlist",
                 "review_candidates", "approve", "queue_approved", "sync_downloads", "write_m3u", "playlist_status",
                 "list_playlists", "library_status"} <= tools
+        assert len(tools) == 42          # the number in cli.py's --full help (55 with soulseek's 13), README, the site
 
         status = payload(await session.call_tool("library_status", {}))
         assert status["bridge"]["reachable"] is True and status["bridge"]["protocol"] == 2

@@ -4,8 +4,8 @@
 
 ## Front doors
 
-- Shell: `flacli get "Artist - Title"`, `flacli sync <file|url|id>`, `flacli status <id>`, `flacli review`, `flacli approve`, `flacli skip`, `flacli queue <id> [--yes]`, `flacli m3u`, `flacli tidy [--apply]`, `flacli search`, `flacli doctor`, `flacli config`. Every command prints one JSON object; errors print {"error": ...} and exit 1. Soulseek matching runs in a detached worker so commands return in seconds; `status` reports the job and has a `next` field naming the command to run.
-- Simple MCP: `flacli mcp` over stdio. Eleven coarse tools (doctor, get_music, sync_playlist, status, review_candidates, approve_tracks, skip_tracks, queue_downloads, write_m3u, tidy_library, cancel_job), one workflow step each, for modest models.
+- Shell: `flacli get "Artist - Title"`, `flacli sync <file|url|id>`, `flacli status <id>`, `flacli review`, `flacli approve`, `flacli skip`, `flacli queue <id> [--yes]`, `flacli m3u`, `flacli tidy [--apply]`, `flacli mpd`, `flacli wiki`, `flacli avatar`, `flacli cover`, `flacli search`, `flacli doctor`, `flacli config`. Every command prints one JSON object; errors print {"error": ...} and exit 1. Soulseek matching runs in a detached worker so commands return in seconds; `status` reports the job and has a `next` field naming the command to run.
+- Simple MCP: `flacli mcp` over stdio. Fifteen coarse tools (doctor, get_music, sync_playlist, status, review_candidates, approve_tracks, skip_tracks, queue_downloads, write_m3u, tidy_library, cancel_job, wiki_todo, wiki_fill, wiki_sources, wiki_write), one workflow step each, for modest models.
 - Full MCP: `flacli mcp --full`. Every fine-grained tool (55) for capable models. `flacli mcp --soulseek` exposes only the raw Nicotine+ tools.
 
 ## Install

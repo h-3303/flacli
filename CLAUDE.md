@@ -72,16 +72,21 @@ src/flacli/
                     P18 → Commons imageinfo (1200 px rendition, author, licence), MusicBrainz "image"
                     relations to Commons, Deezer public search (exact name, never its "/artist//"
                     placeholder), through wiki.Sources' cached JSON fetch; bytes via fetch_bytes.
-                    push_avatar() writes into the player's cache itself (see couplings). Pillow.
+                    push_avatar() writes into the player's cache itself (see couplings). Pillow. fill()
+                    records a miss in avatars.json (file null, mbid, providers, tried) and skips it next
+                    time (tried_before) unless retry, a new mbid, or a picture in the artist folder.
   cover.py          Album covers. missing()/fill()/set_image()/push() over wiki.inventory()'s albums (one per
                     folder; albums in the music dir itself are listed under no_folder and skipped). The cover
                     is <album folder>/cover.jpg|png|webp (COVER_NAMES = what MPD's albumart reads); origins in
                     .wiki/covers.json. CoverSources(PictureSources): Cover Art Archive front-1200 by release
                     then release group (wiki.Sources.album finds the group; 404 = none), Deezer album search,
-                    iTunes Search (100x100bb -> 1200x1200bb); exact _fold matches, edition suffix dropped for
-                    a second try. embedded_picture()/embed_picture() via mutagen (FLAC, ID3, MP4, Ogg); fill
-                    also embeds into tracks with no picture, never replaces one. push() = avatar.push_image
-                    with key '<folder>/'; cover_targets() = wiki_targets + ~/.cache/flaclify/metadata.sqlite
+                    iTunes Search (100x100bb -> 1200x1200bb); Deezer and iTunes match _fold(artist, title)
+                    exactly, edition suffix dropped for a second try; CAA is by id and compares nothing.
+                    embedded_picture()/embed_picture() via mutagen (FLAC, ID3, MP4, Ogg); fill also embeds
+                    into tracks with no picture, never replaces one, and an album that has its cover file
+                    only gets it embedded (nothing fetched, ledger untouched). Misses are recorded in
+                    covers.json and skipped (tried_before) as in avatar.py. push() = avatar.push_image with
+                    key mpd.library_prefix() + '<folder>/'; cover_targets() = wiki_targets + ~/.cache/flaclify/metadata.sqlite
                     when it exists (the memo must be cleared there; tests monkeypatch wiki.TARGETS).
   mpd.py            The player's MPD, stdlib protocol client. candidates() from the `mpd` setting ("" auto:
                     $MPD_HOST/$MPD_PORT, the usual local sockets, localhost:6600; "off"; a socket path;
@@ -89,7 +94,8 @@ src/flacli/
                     given files (whole library above MAX_SCOPED_UPDATES), save_playlist() = playlistclear +
                     playlistadd in order (missing files: update their folders, wait, add again), probe()
                     for doctor. uris are relative to MPD's music_directory (`config`, local socket only),
-                    else to music_dir; outside it = skipped. Never raises past its own functions: every
+                    else to music_dir; outside it = skipped. library_prefix() = the music_dir's own uri
+                    under MPD's root ("" when equal, unknown, or off), the key prefix for cover.push. Never raises past its own functions: every
                     result is a dict, an unreachable MPD is a "skipped" field. Called from server.py
                     (_tidy_files, tidy_apply, write_m3u) and simple.py (doctor, mpd_*). tests/fakempd.py.
   bsonlite.py       Minimal BSON codec for those documents (serde subset; raises on unknown types).
@@ -147,7 +153,7 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     the same fake, sidecars, ledger, renditions into a cache with an images table), test_cover.py
                     (Cover Art Archive / Deezer / iTunes through the fakes, cover files, embedding, folder-keyed push),
                     test_claude_plugin.py (manifests validate strictly when `claude` is installed).
-                    192 tests, ~60 s.
+                    193 tests, ~60 s.
 ```
 
 ## Cross-file couplings (each fails quietly)
@@ -166,12 +172,14 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
 - MCP server names: full server "flacli", raw server "soulseek", simple server "flacli". In Claude
   Code the plugin's servers are `flacli` and `soulseek` (prefix `mcp__plugin_flacli_<server>__`).
 - `config.SETTINGS` ↔ `config.DESCRIPTIONS` ↔ docs/integrations.md's table ↔ README's settings line.
-  `flacli config set` refuses unknown keys, so a new setting needs all four.
+  `flacli config set` refuses unknown keys, so a new setting needs all four. `wiki_targets` "empty for none"
+  has one exception, stated in all four: covers push into Flaclify's cache whenever it exists.
 - `GUIDE.md` ↔ `cli.py` commands and flags. The guide is what an agent reads; a flag renamed in
   argparse and not in the guide is a flag the agent will get wrong.
 - `mcp_simple.py` tool list ↔ `tests/test_worker_e2e.py::test_simple_mcp_server_tool_list` (exact set)
-  ↔ the site's "fifteen coarse tools" and README; the full server's count (55 with soulseek) is in
-  cli.py's `--full` help, mcp_simple.py's docstring, README and the site.
+  ↔ the site's "fifteen coarse tools", site/llms.txt, docs/integrations.md and README; the full server's
+  count (42; 55 with soulseek's 13) is asserted in test_mcp_server.py and written in cli.py's `--full` help,
+  mcp_simple.py's docstring, README and the site.
 - Flaclify reads the sidecars itself (`src/meta_providers/local.rs` there:
   `<folder_uri>/wiki.md`, `<top folder>/artist.md`, `.wiki/<name>.md`, `artist.{jpg,jpeg,png,webp}`; the
   naming must match wiki.py's `_artist_sidecar` / `_safe_name` / `_fold`). The direct push below (`wiki_targets`,
@@ -191,8 +199,9 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
   empty filename is the player's failed-lookup memo; the push replaces it. Cache dir = metadata.sqlite's
   folder (`~/.cache/flaclify`, `~/.cache/euphonica`).
 - `cover.push` ↔ the same images table, key = the album's folder URI relative to MPD's music directory with a
-  trailing slash (`Artist/Album/`), as Flaclify's `strip_filename_linux` makes it; music_dir is assumed to be
-  MPD's root. An empty-filename row there stops Flaclify from ever asking MPD for the art again (`PriorFailure`
+  trailing slash (`Artist/Album/`), as Flaclify's `strip_filename_linux` makes it, prefixed by
+  `mpd.library_prefix()` when music_dir sits inside MPD's library (over TCP `config` is refused and the prefix
+  is ""; doctor's `same_library` note names the case). An empty-filename row there stops Flaclify from ever asking MPD for the art again (`PriorFailure`
   in cache/controller.rs), which is why covers push into `~/.cache/flaclify` even with `wiki_targets` empty.
 - `wiki.LINK_TYPES` includes "image" so avatar.py sees MusicBrainz image relations; the wiki tools show it too.
 - `MIGRATIONS` length ↔ `schema_version` assertions in test_library_db_mb.py and test_mcp_server.py.

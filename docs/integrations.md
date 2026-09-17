@@ -5,7 +5,7 @@ flacli has no harness-specific code. Pick the front door that fits the agent:
 - **Shell.** Any agent that can run commands uses `flacli ...` directly. Give it `flacli guide` (or the contents of
   `src/flacli/GUIDE.md`) as instructions. This is the route for small local models: one command, one JSON result,
   a `next` field that says what to run.
-- **Simple MCP.** `flacli mcp` over stdio: ten tools, one workflow step each. For MCP clients whose model is modest.
+- **Simple MCP.** `flacli mcp` over stdio: fifteen tools, one workflow step each. For MCP clients whose model is modest.
 - **Full MCP.** `flacli mcp --full`: every fine-grained tool. For capable models that can plan a nine-step pipeline.
 - **Raw Soulseek MCP.** `flacli mcp --soulseek`: only the Nicotine+ tools (search, browse, download, transfers).
 
@@ -119,5 +119,5 @@ variables, so an MCP server entry can carry per-client overrides:
 | `bridge_socket` | `NICOTINE_MCP_SOCKET` | only if you changed the socket in the Nicotine+ plugin settings |
 | `tidal_client_id` | `FLACLI_TIDAL_CLIENT_ID` | your TIDAL app's client id |
 | `auto_tidy` | `FLACLI_AUTO_TIDY` | file each finished download as Artist/Album/NN - Title (default on) |
-| `wiki_targets` | `FLACLI_WIKI_TARGETS` | player caches to write bios, wikis and pictures into directly: `flaclify`, `euphonica`, or a path to a `metadata.sqlite`, comma-separated, empty for none. Flaclify also reads the files beside the music itself (default `flaclify`) |
+| `wiki_targets` | `FLACLI_WIKI_TARGETS` | player caches to write bios, wikis and pictures into directly: `flaclify`, `euphonica`, or a path to a `metadata.sqlite`, comma-separated, empty for none. Flaclify also reads the files beside the music itself; album covers go into Flaclify's cache whenever it exists regardless, the only way it takes them (default `flaclify`) |
 | `mpd` | `FLACLI_MPD` | the player's MPD, told about new files and saved playlists: empty = auto (`$MPD_HOST`, the usual local sockets, `localhost:6600`), `off`, a socket path, or `[password@]host[:port]` |

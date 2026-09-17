@@ -54,7 +54,9 @@ a lookup fails it never retries that artist. The four `avatar_*` tools give ever
   artist folder, the Wikidata portrait (Wikimedia Commons, author and licence recorded), a MusicBrainz
   image relation, Deezer's public artist picture (exact name match only). The picture is saved beside
   the music, its origin kept in `.wiki/avatars.json`, and pushed into the player's cache, replacing
-  the player's failed-lookup memo, so it shows at once. Call again while `remaining` > 0.
+  the player's failed-lookup memo, so it shows at once. Call again while `remaining` > 0; it counts only
+  artists not yet tried. Artists the sources had nothing for are remembered in the same file and not asked
+  for again (`tried_before` counts them) unless `retry=True`, so the loop always ends.
   `providers="wikidata,musicbrainz"` leaves Deezer out when the user wants free-licence pictures only.
 - `avatar_set(artist, source, attribution=None)`: one picture from a file or URL the user supplied,
   for the `not_found` ones or when they prefer another. Never invent a URL.
@@ -73,15 +75,21 @@ lookup has failed it never asks again. The four `cover_*` tools give every album
   how many.
 - `cover_fill(limit=10)`: the first provider with a cover, in order: a picture a tagger left in the album
   folder or embedded in a track, the Cover Art Archive front (the tagged release, then the release group
-  MusicBrainz finds), Deezer's album search, the iTunes Search API, exact artist and title matches only.
-  Saved as `Artist/Album/cover.jpg`, embedded in every track that has no picture (never replacing one;
-  `embed=False` leaves the tags alone), its origin kept in `.wiki/covers.json`, and written into the
-  player's cache under the album's folder, clearing the failed-lookup memo. Call again while `remaining` > 0.
-- `cover_set(artist, album, source, attribution=None)`: one cover from a file or URL the user supplied.
+  MusicBrainz finds), Deezer's album search, the iTunes Search API, the last two for an exact artist and
+  title match. Saved as `Artist/Album/cover.jpg`, embedded in every track that has no picture (never
+  replacing one; `embed=False` leaves the tags alone), its origin kept in `.wiki/covers.json`, and written
+  into the player's cache under the album's folder as MPD names it, clearing the failed-lookup memo. An
+  album that already has its cover file only gets it embedded. Call again while `remaining` > 0; it counts
+  only albums not yet tried. Albums the sources had nothing for are remembered in the same file and not
+  asked for again (`tried_before` counts them) unless `retry=True`, so the loop always ends.
+- `cover_set(artist, album, source, attribution=None, embed=True)`: one cover from a file or URL the user
+  supplied; `embed=False` leaves the tags alone.
 - `cover_push(artist=None, album=None)`: write the cover files into the player again.
 
 Report the filled albums as artist, album and source, and name those still without a cover. Step 7 of the
-procedure; embedding writes a picture block into the tracks and nothing else.
+procedure. Embedding changes nothing in a track but its picture block, yet it does rewrite the audio file,
+and `tidy_apply` refuses files written in the last three minutes as a download in progress: do covers after
+step 5, and if a tidy follows, wait three minutes rather than passing `force=True`.
 
 ## Tools
 
@@ -127,11 +135,13 @@ same planner is available from a shell as `flacli tidy [--apply] [--force] [root
    Deletions are always listed individually. Then wait for a yes.
 5. **Apply** with `tidy_apply(confirm=True)`, then call `tidy_analyse` once more and confirm it reports
    zero tag changes, zero deletions, zero moves. Report what was done in numbers, plus the backup path.
-6. **Artist pictures.** `avatar_todo`, then `avatar_fill` until `remaining` is 0; ask the user for a
-   file or URL for the rest and store it with `avatar_set`. Needs no approval: nothing is deleted or
-   moved, and every picture's origin is recorded.
-7. **Album covers.** `cover_todo`, then `cover_fill` until `remaining` is 0; ask the user for a file or
-   URL for the rest and store it with `cover_set`. Say that tracks without a picture get one embedded.
+6. **Artist pictures.** `avatar_todo`, then `avatar_fill` until `remaining` is 0 (misses are remembered,
+   so it ends); ask the user for a file or URL for the rest and store it with `avatar_set`. Needs no
+   approval: nothing is deleted or moved, and every picture's origin is recorded.
+7. **Album covers.** `cover_todo`, then `cover_fill` until `remaining` is 0 (misses are remembered, so it
+   ends); ask the user for a file or URL for the rest and store it with `cover_set`. Say that tracks
+   without a picture get one embedded. The embeds count as recent writes for tidy: do this last, or wait
+   three minutes before another `tidy_apply`.
 
 ## Guardrails
 

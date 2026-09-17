@@ -83,10 +83,13 @@ through MPD and through files beside the music, nothing else:
 - **Playlists.** `flacli m3u` writes the M3U8 and also stores the playlist in MPD under its own name
   (`playlistclear` + `playlistadd`), so it appears in the player's Playlists view; tracks MPD does not know yet get
   their folders updated first. `flacli mpd playlist <id>` does the MPD half on its own.
-- **Bios, wikis, pictures, covers.** `flacli wiki`, `flacli avatar` and `flacli cover` write `Artist/artist.md`, `Artist/Album/wiki.md` and
-  `Artist/artist.jpg` beside the music. Flaclify reads those files itself, before any online provider, and re-reads
-  one whenever it is newer than its cached copy. The direct write into a player's cache (`wiki_targets`, default
-  `flaclify`) is still there for Euphonica and for album covers; set it to nothing once the files alone are enough.
+- **Bios, wikis, pictures, covers.** `flacli wiki`, `flacli avatar` and `flacli cover` write `Artist/artist.md`,
+  `Artist/Album/wiki.md`, `Artist/artist.jpg` and `Artist/Album/cover.jpg` beside the music. Flaclify reads the
+  text and the artist pictures from those files itself, before any online provider, and re-reads one whenever it
+  is newer than its cached copy; album art it takes only from its cache. The direct write into a player's cache
+  (`wiki_targets`, default `flaclify`) is still there for Euphonica; set it to nothing once the files alone are
+  enough. Covers are the exception: they go into Flaclify's cache whenever it exists, whatever `wiki_targets`
+  says, because a failed lookup remembered there would otherwise hide the file for good.
 
 MPD is found through `$MPD_HOST` / `$MPD_PORT`, then the usual local sockets, then `localhost:6600`;
 `flacli config set mpd <socket path | host:port | off>` pins or disables it. Over a local socket flacli reads MPD's
@@ -101,18 +104,22 @@ artist one: a picture a tagger left in the artist folder, else the Wikidata port
 and licence recorded), else a MusicBrainz image relation, else Deezer's public artist picture for an exact name
 match. It is saved beside the music as `Artist/artist.jpg`, where Navidrome and Jellyfin look too, its origin in
 `.wiki/avatars.json`, and written into the player's image cache the way the player would have, so it shows at
-once. `flacli avatar set "Artist" photo.jpg` uses a picture of your own.
+once. An artist none of the sources has is remembered in the same file and not asked for again until
+`--retry`, a new MusicBrainz id in the tags, or a picture dropped into the folder. `flacli avatar set "Artist"
+photo.jpg` uses a picture of your own.
 
 ### Album covers
 
 An album with no `cover.jpg` and no picture in its tracks shows as a grey square, and once the player's lookup
 has failed it never asks again. `flacli cover fill` gives every album one: a picture a tagger left in the folder
 or embedded in a track, else the Cover Art Archive front (the tagged release, then the release group MusicBrainz
-finds), else Deezer's album search, else the iTunes Search API, each for an exact artist and title match. It is
-saved as `Artist/Album/cover.jpg`, where MPD's `albumart`, Navidrome and Jellyfin look, embedded in every track
-that has no picture (never replacing one; `--no-embed` leaves the tags alone), its origin kept in
-`.wiki/covers.json`, and written into the player's cache under the album's folder, clearing the failed-lookup
-memo. `flacli cover set "Artist" "Album" front.png` uses a scan of your own.
+finds), else Deezer's album search, else the iTunes Search API, the last two for an exact artist and title
+match. It is saved as `Artist/Album/cover.jpg`, where MPD's `albumart`, Navidrome and Jellyfin look, embedded in
+every track that has no picture (never replacing one; `--no-embed` leaves the tags alone), its origin kept in
+`.wiki/covers.json`, and written into the player's cache under the album's folder as MPD names it, clearing the
+failed-lookup memo. An album that already has its cover file only gets it embedded. An album none of the sources
+has is remembered in the same file and not asked for again until `--retry`, a new MusicBrainz id in the tags, or
+a picture dropped into the folder. `flacli cover set "Artist" "Album" front.png` uses a scan of your own.
 
 ### Bios and wikis
 

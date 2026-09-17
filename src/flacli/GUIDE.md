@@ -25,11 +25,11 @@ flacli m3u <id>                       write the playlist file; lists what is sti
 flacli tidy [--apply]                 library clean-up plan; apply only after the user saw the deletions
 flacli mpd [update|playlist <id>]     the player's MPD: reachable? rescan folders; store a playlist by name
 flacli avatar missing                 artists with no picture yet (the player shows it as the artist's avatar)
-flacli avatar fill                    a picture per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer
-flacli avatar set "Artist" <file|url> use this picture instead (when fill found none, or the user prefers one)
+flacli avatar fill [--retry]          a picture per artist: artist folder, Wikidata portrait, MusicBrainz, Deezer
+flacli avatar set "Artist" <file|url> [--attribution "..."]  use this picture instead (fill found none, or the user prefers one)
 flacli cover missing                  albums with no cover file, or tracks without an embedded picture
-flacli cover fill                     a cover per album: folder or track picture, Cover Art Archive, Deezer, iTunes
-flacli cover set "Artist" "Album" <file|url>  use this cover instead
+flacli cover fill [--retry] [--no-embed]  a cover per album: folder or track picture, Cover Art Archive, Deezer, iTunes
+flacli cover set "Artist" "Album" <file|url> [--attribution "..."] [--no-embed]  use this cover instead
 flacli search "query"                 raw Soulseek search when the matcher found nothing
 flacli wiki missing                   artists and albums with no bio / wiki text yet
 flacli wiki fill                      Wikipedia text where an article exists; briefs with facts for the rest
@@ -95,7 +95,9 @@ cache so it shows at once.
 1. `flacli avatar missing` lists artists without a picture. Say how many.
 2. `flacli avatar fill` takes them ten at a time: a picture a tagger left in the artist folder, else the
    Wikidata portrait (Wikimedia Commons, author and licence recorded), else a MusicBrainz image relation,
-   else Deezer's public artist picture (exact name match only). Run again while `remaining` > 0.
+   else Deezer's public artist picture (exact name match only). Run again while `remaining` > 0; it counts only
+   artists not yet tried. Artists the sources had nothing for are remembered in `.wiki/avatars.json` and not
+   asked for again (`tried_before` counts them) unless `--retry`, so the loop always ends.
    `--providers wikidata,musicbrainz` leaves Deezer out when the user prefers free-licence pictures only.
 3. `not_found` artists need a picture from the user: a file or a URL, then
    `flacli avatar set "Artist" <file|url> --attribution "..."`. Never invent a URL.
@@ -111,11 +113,17 @@ player's cache so it shows at once.
 1. `flacli cover missing` lists albums with no cover file or with tracks lacking a picture. Say how many.
 2. `flacli cover fill` takes them ten at a time: a picture already in the folder or in a track, else the
    Cover Art Archive front (tagged release, then the release group MusicBrainz finds), else Deezer's album
-   search, else the iTunes Search API, exact artist and title matches only. Run again while `remaining` > 0.
-   `--no-embed` when the user does not want the tracks' tags touched; `--providers local,coverart` to stay
-   with pictures whose origin is a music database.
+   search, else the iTunes Search API, the last two for an exact artist and title match. An album that already
+   has its cover file only gets it embedded. Run again while `remaining` > 0; it counts only albums not yet
+   tried. Albums the sources had nothing for are remembered in `.wiki/covers.json` and not asked for again
+   (`tried_before` counts them) unless `--retry`, so the loop always ends.
+   `--no-embed` when the user does not want the tracks' tags touched; `--providers coverart` when only a cover
+   the Cover Art Archive holds for the tagged release will do (`local` takes whatever a tagger left behind).
+   Each embedded picture rewrites the audio file, and `flacli tidy` treats files written in the last three
+   minutes as a download in progress: fill covers after tidying, or wait before tidying again.
 3. `not_found` albums need a cover from the user: a file or a URL, then
-   `flacli cover set "Artist" "Album" <file|url>`. Never invent a URL.
+   `flacli cover set "Artist" "Album" <file|url> --attribution "..."` (`--no-embed` to leave the tags alone).
+   Never invent a URL.
 4. Report the `filled` list as artist, album and source; name the albums still without a cover.
 
 ## Rules
