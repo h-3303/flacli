@@ -22,8 +22,9 @@ import sys
 import time
 
 POLL_S = float(os.environ.get("FLACLI_MONITOR_POLL_S") or 20)
-FAILED = {"Cancelled", "Filtered", "User logged off", "Connection closed", "Connection timeout",
-          "Download folder error", "Local file error"}
+# Mirrors flacli.server.LIVE_TRANSFER_STATUSES: anything else is a failure, a peer's refusal ("File not shared.",
+# "Banned", ...) included, since Nicotine+ stores the reason as the status and never retries it.
+LIVE = {"Queued", "Getting status", "Transferring", "Paused", "Finished"}
 
 
 def settings():
@@ -168,11 +169,11 @@ class Monitor:
                 if status == "Finished":
                     name, suffix = describe(transfer, self.data_dir)
                     emit(f"flacli: finished {name!r} from {transfer['user']} -> {transfer.get('folder') or 'download folder'}{suffix}")
-                elif status in FAILED and before not in FAILED:
+                elif status not in LIVE and (before is None or before in LIVE):
                     name, suffix = describe(transfer, self.data_dir)
                     emit(f"flacli: {status.lower()}: {name!r} from {transfer['user']}{suffix}")
 
-        active = [d for d in current.values() if d["status"] not in FAILED and d["status"] != "Finished"]
+        active = [d for d in current.values() if d["status"] in LIVE and d["status"] != "Finished"]
 
         if self.known is not None and not active and not self.announced_idle:
             emit("flacli: no downloads in progress; sync_downloads will settle the playlist state")

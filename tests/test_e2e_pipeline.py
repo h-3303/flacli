@@ -295,11 +295,76 @@ async def test_failed_transfer_retries_next_candidate(library_server, tmp_path):
     synced = await server.sync_downloads(playlist_id)
     assert synced["retried"] == 1 and synced["failed"] == 0
     users = sorted(t.username for t in harness.transfers())
-    assert users == ["peerC-flac", "peerC-mp3"], "the next candidate was queued"
+    assert users == ["peerC-mp3"], "the next candidate was queued and the failed transfer cleared"
     row = server.db().track(lonely["track_id"])
     assert row["status"] == "queued" and server.db().candidates(row)[0]["user"] == "peerC-mp3"
     assert server.db().user_failures(server.db().active_job(playlist_id)["id"] if server.db().active_job(playlist_id) else
                                      server.db().conn.execute("SELECT id FROM jobs ORDER BY id DESC").fetchone()["id"]) == {"peerC-flac": 1}
+
+
+async def _queue_lonely(server, playlist_id):
+    review = await server.review_candidates(playlist_id)
+    lonely = next(t for t in review["tracks"] if t["title"].startswith("Lonely"))
+    await server.approve(track_ids=[lonely["track_id"]])
+    await server.queue_approved(playlist_id, confirm=True)
+    return lonely
+
+
+def _last_job_id(server):
+    return server.db().conn.execute("SELECT id FROM jobs ORDER BY id DESC").fetchone()["id"]
+
+
+async def test_peer_refusal_fails_the_transfer_and_skips_the_user(library_server):
+    """'File not shared.' is the peer's reason stored as the status; Nicotine+ never retries it. It must count as a
+    failure (not sit at 'queued' forever), penalise the user to the skip threshold at once, and the dead transfer
+    is cleared from Nicotine+ once the replacement is queued."""
+    server, harness, music, fake_mb, peers = library_server
+    (playlist,) = (await server.import_playlist_file(str(FIXTURES / "exportify.csv")))["imported"]
+    playlist_id = playlist["playlist_id"]
+    await server.resolve_playlist(playlist_id)
+    await server.match_playlist(playlist_id, album_mode="off", harvest_seconds=0.3)
+    await asyncio.wait_for(server.State.jobs[playlist_id], timeout=60)
+    lonely = await _queue_lonely(server, playlist_id)
+    (transfer,) = harness.transfers()
+
+    def refuse():
+        transfer.status = "File not shared."
+
+    harness.on_main(refuse)
+    synced = await server.sync_downloads(playlist_id)
+    assert synced["retried"] == 1 and synced["failed"] == 0 and synced["queued"] == 0
+    assert [t.username for t in harness.transfers()] == ["peerC-mp3"], "replacement queued, refused transfer cleared"
+    row = server.db().track(lonely["track_id"])
+    assert row["status"] == "queued" and row["last_error"] == "retry after peerC-flac failed"
+    assert server.db().user_failures(_last_job_id(server)) == {"peerC-flac": 2}
+
+
+async def test_folder_candidate_is_a_fallback_for_its_assigned_file(library_server):
+    """A track matched in album mode only has folder candidates; when its transfer fails, the next folder's file
+    assigned to this track is requested on its own."""
+    server, harness, music, fake_mb, peers = library_server
+    (playlist,) = (await server.import_playlist_file(str(FIXTURES / "exportify.csv")))["imported"]
+    playlist_id = playlist["playlist_id"]
+    await server.resolve_playlist(playlist_id)
+    await server.match_playlist(playlist_id, album_mode="off", harvest_seconds=0.3)
+    await asyncio.wait_for(server.State.jobs[playlist_id], timeout=60)
+    lonely = await _queue_lonely(server, playlist_id)
+    row = server.db().track(lonely["track_id"])
+    current, alternative = server.db().candidates(row)
+    folder = {"kind": "folder", "user": alternative["user"], "folder": alternative["path"].rpartition("\\")[0],
+              "expected_path": alternative["path"], "confidence": 0.9, "score": 0.8, "track_count": 1}
+    server.db().set_match(row["id"], "queued", candidates=[current, folder])
+    (transfer,) = harness.transfers()
+
+    def drop():
+        transfer.status = "Connection closed"
+
+    harness.on_main(drop)
+    synced = await server.sync_downloads(playlist_id)
+    assert synced["retried"] == 1
+    (replacement,) = harness.transfers()
+    assert (replacement.username, replacement.virtual_path) == (alternative["user"], alternative["path"])
+    assert server.db().candidates(server.db().track(row["id"]))[0]["kind"] == "folder"
 
 
 async def test_rate_limit_wait_is_visible(library_server):

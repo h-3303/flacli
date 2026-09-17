@@ -44,8 +44,15 @@ READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 WRITE_LOCAL = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
 NETWORK = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True)
 
-FAILED_TRANSFER_STATUSES = {"Cancelled", "Filtered", "User logged off", "Connection closed", "Connection timeout",
-                            "Download folder error", "Local file error"}
+# Nicotine+ keeps a transfer at one of its own statuses while there is still something to wait for. A peer that
+# refuses stores its reason verbatim ("File not shared.", "Banned", "Disallowed extension", "File read error." ...)
+# and nothing retries it, so every status outside this set is a failure. The monitor in plugins/claude-code
+# carries the same set.
+LIVE_TRANSFER_STATUSES = {"Queued", "Getting status", "Transferring", "Paused", "Finished"}
+# Reasons that say the user's share listing is stale or the user is closed to us: their other files are as good
+# as failed, so the user is penalised to the skip threshold at once instead of one failure per file.
+STALE_SHARE_REASONS = {"File not shared.", "Banned", "Disallowed extension"}
+USER_SKIP_FAILURES = 2
 
 mcp = MCPServer(
     name="flacli",
@@ -874,17 +881,27 @@ async def _queue(files, folders) -> dict:
     return {"queued": queued, "errors": errors}
 
 
-async def _next_candidate(row, failed_user, job_failures):
+def _candidate_path(candidate) -> str | None:
+    """The file to ask for: a file candidate's own path, or the track's assigned path inside a folder candidate."""
+    return candidate["path"] if candidate["kind"] == "file" else candidate.get("expected_path")
+
+
+async def _next_candidate(row, failed_user, job_failures, preferred_users=()):
+    """Queue the track from its next usable candidate, a single file either way (a folder candidate contributes the
+    one file assigned to this track). Users at the skip threshold are passed over; among the rest, a user already
+    serving another track of this playlist comes first so an album stays together where it can."""
     candidates = db().candidates(row)
-    remaining = [c for c in candidates[1:] if c["kind"] == "file" and job_failures.get(c["user"], 0) < 2]
+    remaining = [c for c in candidates[1:]
+                 if _candidate_path(c) and job_failures.get(c["user"], 0) < USER_SKIP_FAILURES and c["user"] != failed_user]
+    remaining.sort(key=lambda c: c["user"] not in preferred_users)
 
     if not remaining or row["attempts"] >= MatchPrefs.max_attempts:
         return None
 
     chosen = remaining[0]
     attrs = {k: chosen.get(k) for k in ("bitrate", "duration", "vbr", "sample_rate", "bit_depth")}
-    result = await bridge().call("download_file", username=chosen["user"], path=chosen["path"],
-                                 size=chosen.get("size") or 0, attrs=attrs)
+    result = await bridge().call("download_file", username=chosen["user"], path=_candidate_path(chosen),
+                                 size=(chosen.get("size") or 0) if chosen["kind"] == "file" else 0, attrs=attrs)
     reordered = [chosen] + [c for c in candidates if c is not chosen]
     db().set_match(row["id"], "queued", candidates=reordered, confidence=chosen["confidence"],
                    download_id=result["queued"][0]["download_id"], last_error=f"retry after {failed_user} failed",
@@ -896,7 +913,10 @@ async def _next_candidate(row, failed_user, job_failures):
 @tool_errors
 async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
     """Map queued transfers to their Nicotine+ status: done (with local path), downloading, queued, or failed.
-    With retry, a failed transfer is re-queued from the next candidate (users that failed twice are skipped)."""
+    A transfer at any status Nicotine+ would not move on its own (a peer's refusal such as "File not shared.",
+    a dropped connection, a cancel) has failed. With retry, it is re-queued from the next candidate, single file
+    or the track's file inside a folder candidate, and the replaced transfer is cleared from Nicotine+. A user
+    who failed twice, or once with a stale share ("File not shared.", "Banned"), is skipped for the job."""
     db().get_playlist(playlist_id)
     rows = db().tracks(playlist_id, statuses=["queued", "downloading"])
 
@@ -910,6 +930,9 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
     failures = db().user_failures(job_id) if job_id else {}
     changes = {"done": 0, "downloading": 0, "queued": 0, "failed": 0, "retried": 0, "missing": 0}
     finished: list[str] = []
+    replaced: list[str] = []
+    serving = {by_id[r["download_id"]]["user"] for r in rows
+               if r["download_id"] in by_id and by_id[r["download_id"]]["status"] in LIVE_TRANSFER_STATUSES}
 
     for row in rows:
         transfer = by_id.get(row["download_id"]) if row["download_id"] else None
@@ -928,23 +951,33 @@ async def sync_downloads(playlist_id: int, retry: bool = True) -> dict:
         elif status == "Transferring":
             db().set_match(row["id"], "downloading")
             changes["downloading"] += 1
-        elif status in FAILED_TRANSFER_STATUSES:
+        elif status not in LIVE_TRANSFER_STATUSES:
             user = transfer["user"]
+            weight = USER_SKIP_FAILURES if status in STALE_SHARE_REASONS else 1
+            serving.discard(user)
 
             if job_id:
-                db().penalise_user(job_id, user)
-                failures[user] = failures.get(user, 0) + 1
+                db().penalise_user(job_id, user, weight)
 
-            replacement = await _next_candidate(row, user, failures) if retry else None
+            failures[user] = failures.get(user, 0) + weight
+            replacement = await _next_candidate(row, user, failures, serving) if retry else None
 
             if replacement is None:
                 db().set_match(row["id"], "failed", last_error=f"{status} from {user}")
                 changes["failed"] += 1
             else:
+                serving.add(replacement["user"])
+                replaced.append(row["download_id"])
                 changes["retried"] += 1
         else:
             db().set_match(row["id"], "queued")
             changes["queued"] += 1
+
+    if replaced:
+        try:
+            await bridge().call("clear_downloads", download_ids=replaced)
+        except BridgeError:
+            pass   # cosmetic: the dead transfer stays in Nicotine+'s list, the replacement is queued regardless
 
     result = {"playlist_id": playlist_id, "checked": len(rows), **changes,
               "counts": {k: v for k, v in db().status_counts(playlist_id).items() if v}}

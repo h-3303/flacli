@@ -153,11 +153,14 @@ tests/              pytest; `uv run pytest`. conftest fetches Nicotine+ source i
                     the same fake, sidecars, ledger, renditions into a cache with an images table), test_cover.py
                     (Cover Art Archive / Deezer / iTunes through the fakes, cover files, embedding, folder-keyed push),
                     test_claude_plugin.py (manifests validate strictly when `claude` is installed).
-                    193 tests, ~60 s.
+                    198 tests, ~60 s.
 ```
 
 ## Cross-file couplings (each fails quietly)
 
+- `server.LIVE_TRANSFER_STATUSES` ↔ `LIVE` in `plugins/claude-code/monitors/downloads.py`. Nicotine+ stores a
+  peer's refusal reason verbatim as the transfer status ("File not shared.", with the full stop) and never retries
+  it, so both treat every status outside the live set as a failure; listing failures by name missed those.
 - `worker.PREF_FIELDS` ↔ `matcher.MatchPrefs` fields. A new pref the CLI should pass must be added to
   PREF_FIELDS or it silently keeps its default in the worker.
 - `simple._start_job()` creates the job row, then `jobs.spawn()` records the pid. A job created any

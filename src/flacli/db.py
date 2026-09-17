@@ -415,10 +415,10 @@ class Database:
         self.conn.execute("UPDATE jobs SET status = 'interrupted', updated_at = ? WHERE status IN ('running', 'waiting')",
                           (utcnow(),))
 
-    def penalise_user(self, job_id, username):
+    def penalise_user(self, job_id, username, weight=1):
         self.conn.execute(
-            "INSERT INTO user_penalties (job_id, username, failures) VALUES (?, ?, 1) "
-            "ON CONFLICT(job_id, username) DO UPDATE SET failures = failures + 1", (job_id, username)
+            "INSERT INTO user_penalties (job_id, username, failures) VALUES (?, ?, ?) "
+            "ON CONFLICT(job_id, username) DO UPDATE SET failures = failures + excluded.failures", (job_id, username, weight)
         )
 
     def user_failures(self, job_id) -> dict:
