@@ -31,8 +31,12 @@ def test_parse_items():
     assert requester.parse_item({"artist": "Lorde", "title": "Royals", "album": "Pure Heroine"})["album"] == "Pure Heroine"
     assert requester.parse_item({"artist": "Lorde", "album": "Pure Heroine"})["kind"] == "album"
     assert requester.parse_item({"kind": "album", "artist": "Lorde", "album": "Melodrama"})["album"] == "Melodrama"
+    # A JSON string is the dict form for callers that spawn the CLI; dashes inside names survive it.
+    assert requester.parse_item('{"kind": "track", "artist": "Godspeed You! Black Emperor", "title": "Storm - Lift Yr. Skinny Fists"}') == {
+        "kind": "track", "artist": "Godspeed You! Black Emperor", "title": "Storm - Lift Yr. Skinny Fists", "album": ""}
+    assert requester.parse_item('{"artist": "Lorde", "album": "Pure Heroine"}')["kind"] == "album"
 
-    for bad in ("", "   ", {"artist": "Lorde"}, {"kind": "video", "title": "x"}):
+    for bad in ("", "   ", {"artist": "Lorde"}, {"kind": "video", "title": "x"}, "{not json", "{}"):
         with pytest.raises(ValueError):
             requester.parse_item(bad)
 

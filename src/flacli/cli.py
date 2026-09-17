@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("value", nargs="?", help="new value, for set")
 
     p = commands.add_parser("get", help="fetch named songs or albums: 'Artist - Title', 'Artist - Album (album)'")
-    p.add_argument("items", nargs="+", help="one or more items; an album needs '(album)' after its name")
+    p.add_argument("items", nargs="+", help="one or more items; an album needs '(album)' after its name, or a JSON object {\"kind\", \"artist\", \"title\"|\"album\"}")
     p.add_argument("--playlist", default="Requests", help="request playlist to append to (default: Requests)")
     p.add_argument("--min-confidence", type=float, default=0.85, help="auto-queue matches at or above this (default 0.85)")
     p.add_argument("--lossy", action="store_true", help="accept mp3/ogg/opus/m4a as well as flac")

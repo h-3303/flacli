@@ -2,10 +2,12 @@
 """Direct requests: named songs and albums become tracks of a persistent request playlist.
 
 Items are either dicts ({"artist", "title"} for a song, {"artist", "album"} for a whole album) or strings:
-"Artist - Title", "Artist - Album (album)", "album: Artist - Album". An album is expanded into its tracklist
+"Artist - Title", "Artist - Album (album)", "album: Artist - Album", or the dict as a JSON string (for callers that
+spawn the CLI and hold names with a dash in them). An album is expanded into its tracklist
 through MusicBrainz so that the matcher's album mode can fetch the whole folder and check the track count.
 """
 
+import json
 import re
 
 from .models import Track
@@ -37,6 +39,18 @@ def parse_item(item) -> dict:
         raise ValueError(f"kind must be 'track' or 'album': {item!r}")
 
     text = str(item).strip()
+
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"item looks like JSON but does not parse: {error}") from error
+
+        if not isinstance(parsed, dict):
+            raise ValueError(f"a JSON item must be an object: {item!r}")
+
+        return parse_item(parsed)
+
     kind = "track"
     marked = ALBUM_MARK.match(text)
 

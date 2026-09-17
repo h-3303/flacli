@@ -15,7 +15,7 @@ calls are MusicBrainz lookups and Soulseek traffic through the user's own Nicoti
 
 When the user names songs or albums rather than handing over a playlist, call `request_music(items)`
 once with everything they named: `{"artist": ..., "title": ...}` per song, `{"artist": ..., "album": ...}`
-per album (strings "Artist - Title" / "Artist - Album (album)" also work). It appends them to the
+per album (strings "Artist - Title" / "Artist - Album (album)" also work, and so does the dict as a JSON string). It appends them to the
 persistent **Requests** playlist (a different `playlist=` name keeps things apart), expands albums to
 their tracklist through MusicBrainz, checks the library, and starts one background job that matches the
 rest and queues every match at or above `min_confidence` (0.85), whole folders for albums. This is the one

@@ -54,6 +54,7 @@ Settings live in `~/.config/flacli/config.toml`; environment variables (`FLACLI_
 
 ```bash
 flacli get "Lorde - Royals" "Boards of Canada - Geogaddi (album)"
+flacli get '{"kind": "track", "artist": "Lorde", "title": "Royals"}'   # JSON when a name holds a dash
 flacli status 1                       # a minute later: job progress, downloads, where files went
 flacli sync ~/Downloads/Playlist1.json
 flacli status 2                       # until the job is finished
