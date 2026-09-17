@@ -74,6 +74,8 @@ def test_analyse_plans_tags_moves_and_flac_beats_lossy(library):
     (library / ".thumbnails" / "x.png").parent.mkdir()
     (library / ".thumbnails" / "x.png").write_bytes(b"png")
     (library / "notes.md").write_text("stray")
+    (library / "Artist A").mkdir(exist_ok=True)
+    (library / "Artist A" / "artist.md").write_text("bio")   # flacli wiki's own sidecar: not a stray
     settle(library)
 
     summary = Tidy(library).analyse()

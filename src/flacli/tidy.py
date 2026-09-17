@@ -45,6 +45,8 @@ EXT = {".flac", ".mp3", ".m4a", ".ogg", ".opus"}
 LOSSLESS = {".flac"}
 IMG = {".jpg", ".jpeg", ".png"}
 EXTRA = {".pdf", ".nfo"}
+# The sidecars flacli itself writes beside the music (wiki, avatar, cover); never strays.
+SIDECAR = {"artist.md", "wiki.md"}
 FIELDS = ["ARTIST", "ALBUMARTIST", "ALBUM", "TITLE", "DATE", "TRACKNUMBER", "TOTALTRACKS", "DISCNUMBER", "TOTALDISCS"]
 MP4MAP = {"ARTIST": "©ART", "ALBUMARTIST": "aART", "ALBUM": "©alb", "TITLE": "©nam", "DATE": "©day"}
 MP4_TEXT = {"©ART", "aART", "©alb", "©nam", "©day", "©gen", "©wrt", "©cmt", "©lyr", "©too", "cprt", "©grp", "soar",
@@ -758,7 +760,8 @@ class Tidy:
         def is_extra(rel):
             return os.path.splitext(rel)[1].lower() in EXTRA and rel.count(os.sep) == 2
 
-        plan["stray"] = [s for s in stray if s not in handled and os.path.splitext(s)[1].lower() not in IMG and not is_extra(s)]
+        plan["stray"] = [s for s in stray if s not in handled and os.path.splitext(s)[1].lower() not in IMG and not is_extra(s)
+                         and os.path.basename(s) not in SIDECAR]
         plan["images"] = [s for s in stray if s not in handled and os.path.splitext(s)[1].lower() in IMG]
 
         # files still being written (downloader in flight)
