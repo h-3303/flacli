@@ -314,8 +314,9 @@ async def delete_playlist(playlist_id: int) -> dict:
     if task and not task.done():
         task.cancel()
 
+    cancelled = await _cancel_transfers(db().tracks(playlist_id))
     db().delete_playlist(playlist_id)
-    return {"deleted": playlist_id, "name": playlist["name"]}
+    return {"deleted": playlist_id, "name": playlist["name"], **cancelled}
 
 
 # Direct requests #
@@ -741,13 +742,47 @@ async def approve(
 
 @mcp.tool(annotations=WRITE_LOCAL)
 @tool_errors
+async def _cancel_transfers(rows) -> dict:
+    """Cancel the Nicotine+ transfers of queued or downloading rows, best effort; partial files stay in
+    Nicotine+'s incomplete folder."""
+    ids = [r["download_id"] for r in rows if r["status"] in ("queued", "downloading") and r["download_id"]]
+
+    if not ids:
+        return {"cancelled_downloads": 0}
+
+    try:
+        await bridge().call("cancel_downloads", download_ids=ids)
+    except BridgeError as error:
+        return {"cancelled_downloads": 0, "cancel_error": f"{len(ids)} transfer(s) left in Nicotine+: {error}"}
+
+    return {"cancelled_downloads": len(ids)}
+
+
 async def skip_tracks(track_ids: list[int], reason: str = "skipped by user") -> dict:
-    """Mark tracks as skipped so matching and M3U reporting leave them alone."""
+    """Mark tracks as skipped so matching and M3U reporting leave them alone. A queued or running transfer
+    of theirs is cancelled in Nicotine+ first."""
+    rows = [db().track(track_id) for track_id in track_ids]
+    result = await _cancel_transfers(rows)
+
     for track_id in track_ids:
-        db().track(track_id)
         db().set_match(track_id, "skipped", last_error=reason)
 
-    return {"skipped": len(track_ids)}
+    result["skipped"] = len(track_ids)
+    return result
+
+
+async def skip_remaining(playlist_id: int, reason: str = "skipped by user") -> dict:
+    """Give up on everything of a playlist not yet on disk: the running job is stopped, queued transfers
+    are cancelled, and every track not done, in the library or already skipped is marked skipped."""
+    task = State.jobs.get(playlist_id)
+
+    if task and not task.done():
+        task.cancel()
+
+    rows = [r for r in db().tracks(playlist_id) if r["status"] not in ("done", "in_library", "skipped")]
+    result = await skip_tracks([r["id"] for r in rows], reason=reason)
+    result["playlist_id"] = playlist_id
+    return result
 
 
 def _queue_plan(playlist_id, track_ids=None):

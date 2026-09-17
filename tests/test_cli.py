@@ -91,6 +91,24 @@ def test_doctor_without_bridge(home):
     assert report["music_dir_exists"] is True and report["playlists"] == 0
 
 
+def test_skip_remaining_offline(home):
+    fixtures = Path(__file__).parent / "fixtures"
+    code, imported = run("import", str(fixtures / "exportify.csv"))
+    assert code == 0
+    (entry,) = imported["imported"]
+    playlist_id = entry["playlist_id"]
+
+    code, skipped = run("skip", str(playlist_id), "--remaining")
+    assert code == 0 and skipped == {"skipped": entry["tracks"], "cancelled_downloads": 0, "playlist_id": playlist_id}
+
+    code, status = run("status", str(playlist_id))
+    assert code == 0 and status["counts"] == {"skipped": entry["tracks"]} and status["missing"] == [] or \
+        {m["status"] for m in status["missing"]} == {"skipped"}
+
+    code, _ = run("skip", str(playlist_id))
+    assert code != 0
+
+
 def test_import_status_scan_m3u_offline(home):
     fixtures = Path(__file__).parent / "fixtures"
     code, imported = run("import", str(fixtures / "exportify.csv"))

@@ -343,6 +343,11 @@ async def skip(track_ids: list[int], reason: str = "skipped by user") -> dict:
     return await server.skip_tracks(track_ids, reason=reason)
 
 
+async def skip_remaining(playlist_id: int, reason: str = "skipped by user") -> dict:
+    """Give up on what a playlist still lacks: stop its job, cancel its transfers, skip the rest."""
+    return await server.skip_remaining(playlist_id, reason=reason)
+
+
 async def queue(playlist_id: int, yes: bool = False, min_confidence: float | None = None) -> dict:
     """Totals of what would be downloaded; with yes=True the transfers are queued in Nicotine+."""
     approved_now = None

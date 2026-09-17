@@ -101,9 +101,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--candidate", type=int, default=0, help="which candidate to take for --tracks (0 = best)")
     p.add_argument("--min-confidence", type=float, help="approve every track at or above this confidence")
 
-    p = commands.add_parser("skip", help="mark tracks as skipped")
+    p = commands.add_parser("skip", help="mark tracks as skipped; a queued transfer of theirs is cancelled")
     p.add_argument("playlist_id", type=int)
-    p.add_argument("--tracks", required=True, help="comma-separated track ids")
+    p.add_argument("--tracks", help="comma-separated track ids")
+    p.add_argument("--remaining", action="store_true",
+                   help="every track not yet on disk: stops the job, cancels queued transfers, skips the rest")
     p.add_argument("--reason", default="skipped by user")
 
     p = commands.add_parser("queue", help="show what would be downloaded; --yes queues it in Nicotine+")
@@ -285,6 +287,11 @@ async def dispatch(args) -> dict | str | None:
         return await simple.approve(args.playlist_id, track_ids=_ids(args.tracks) if args.tracks else None,
                                     min_confidence=args.min_confidence, candidate=args.candidate)
     if command == "skip":
+        if args.remaining:
+            return await simple.skip_remaining(args.playlist_id, reason=args.reason)
+        if not args.tracks:
+            raise ValueError("give --tracks ids or --remaining")
+
         return await simple.skip(_ids(args.tracks), reason=args.reason)
     if command == "queue":
         return await simple.queue(args.playlist_id, yes=args.yes, min_confidence=args.min_confidence)
