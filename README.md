@@ -13,7 +13,7 @@ The same engine now has three front doors, so the tool works with whatever drive
 | Front door | Run | For |
 | --- | --- | --- |
 | **CLI** | `flacli get "Lorde - Royals"` | any agent with a shell, including small local models; humans |
-| **Simple MCP** | `flacli mcp` | MCP clients with a modest model: ten coarse tools, one step each |
+| **Simple MCP** | `flacli mcp` | MCP clients with a modest model: eleven coarse tools, one step each |
 | **Full MCP** | `flacli mcp --full` | capable models: every fine-grained tool (43) |
 
 Every CLI command prints one JSON object and returns within seconds; Soulseek matching runs in a detached worker
