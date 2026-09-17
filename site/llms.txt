@@ -1,0 +1,44 @@
+# flacli
+
+> A command line and two MCP servers that get music onto disk from any agent, or from a shell. Name songs and albums, or hand over a playlist (TIDAL, Deezer, YouTube Music, or an export file: Spotify data export, Exportify CSV, CSV, M3U, JSPF, XSPF); flacli canonicalises the tracks against MusicBrainz, finds which ones the local library already has, fetches the rest from Soulseek through the user's own running Nicotine+ client, files each track as Artist/Album/NN - Title as it lands, and writes an M3U in the original order. It is a fork of claude-music with the Claude Code plugin layer removed: the same engine now works with any agent that can run a command, including small local models. Everything runs locally. GPL-3.0-or-later.
+
+## Front doors
+
+- Shell: `flacli get "Artist - Title"`, `flacli sync <file|url|id>`, `flacli status <id>`, `flacli review`, `flacli approve`, `flacli skip`, `flacli queue <id> [--yes]`, `flacli m3u`, `flacli tidy [--apply]`, `flacli search`, `flacli doctor`, `flacli config`. Every command prints one JSON object; errors print {"error": ...} and exit 1. Soulseek matching runs in a detached worker so commands return in seconds; `status` reports the job and has a `next` field naming the command to run.
+- Simple MCP: `flacli mcp` over stdio. Eleven coarse tools (doctor, get_music, sync_playlist, status, review_candidates, approve_tracks, skip_tracks, queue_downloads, write_m3u, tidy_library, cancel_job), one workflow step each, for modest models.
+- Full MCP: `flacli mcp --full`. Every fine-grained tool (43) for capable models. `flacli mcp --soulseek` exposes only the raw Nicotine+ tools.
+
+## Install
+
+    git clone https://github.com/h-3303/flacli ~/src/flacli && cd ~/src/flacli && ./install.sh
+
+Requires Nicotine+ 3.3 or newer and uv. The script copies the MCP Bridge plugin into Nicotine+'s plugin folder (native or Flatpak) and runs `uv tool install .` so `flacli` lands on PATH. Then tick "MCP Bridge" in Nicotine+ → Preferences → Plugins and run `flacli doctor`.
+
+Settings: `~/.config/flacli/config.toml` (`flacli config set music_dir ~/Music`), overridden by FLACLI_MUSIC_DIR, FLACLI_DATA, FLACLI_CONTACT, NICOTINE_MCP_SOCKET, FLACLI_TIDAL_CLIENT_ID, FLACLI_AUTO_TIDY.
+
+## Agent guide
+
+`flacli guide` prints the guide (also at src/flacli/GUIDE.md in the repository): a quick reference, the workflow for named music (get → status → review if needed → status), the workflow for playlists (sync → status until finished → queue to see totals → queue --yes on the user's yes → review the rest → m3u), and the rules: never pass --yes without the user's explicit yes in the same conversation (get is the exception: naming the music is the yes); never delete files by hand, tidy plans deletions and --apply needs a yes; if Nicotine+ is unreachable say so and stop; do not work around the Soulseek search rate limit; prefer FLAC; do not paste whole tracklists; never echo tokens or headers.
+
+## Integrations
+
+docs/integrations.md in the repository has the configuration for Claude Code (`claude mcp add --scope user flacli -- flacli mcp`), Codex CLI (~/.codex/config.toml), Gemini CLI (~/.gemini/settings.json), opencode (opencode.json), Goose (config.yaml), Claude Desktop, and local models through Ollama, llama.cpp or LM Studio (a shell tool with `flacli guide --short` in the system prompt, or any MCP-capable client registering `flacli mcp`).
+
+## How it works
+
+1. Import or request: playlists become JSPF files with a playlist_id; named items are appended to a persistent "Requests" playlist and albums are expanded to their tracklist on MusicBrainz.
+2. Resolve: ISRC first, then artist, title and duration against MusicBrainz, one request a second, cached, with a proper User-Agent.
+3. Diff: the library is indexed with mutagen; matches by MusicBrainz id, then ISRC, then normalised text within a duration tolerance.
+4. Match: a worker process searches Soulseek per track through the Nicotine+ bridge, scores every result (title, artist, album, duration, format, free slot, queue) and keeps the best few. Three or more missing tracks of one release become an album search; the folder is inspected and its track count checked.
+5. Approve and queue: confident candidates (≥ 0.85) are auto-approved by get and by sync --yes; everything else waits for review. queue shows tracks, MB and users; --yes sends the transfers to Nicotine+.
+6. Sync and tidy: status maps transfers to done/failed, retries from the next candidate, and files each finished track (tags normalised, Artist/Album/NN - Title, cover art following). tidy plans the rest of the library: tag rules, lossy duplicates of FLACs, playlist dumps, moves; a report and a plan first, deletions only by name and after a yes.
+7. M3U in the original order; missing tracks listed, never dropped.
+
+The Nicotine+ side is a small stdlib-only plugin ("MCP Bridge") listening on a 0600 Unix socket with peer-credential checks; it enforces a search rate limit of 34 searches per 220 seconds because Soulseek bans an account for thirty minutes when exceeded.
+
+## Links
+
+- Repository: https://github.com/h-3303/flacli
+- Original project: https://claude-music-liard.vercel.app/ (Claude Code plugin)
+- Nicotine+: https://nicotine-plus.org/
+- MusicBrainz: https://musicbrainz.org/

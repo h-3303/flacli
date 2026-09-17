@@ -1,5 +1,7 @@
 # flacli
 
+**Site:** https://flacli.vercel.app · **Repo:** https://github.com/h-3303/flacli
+
 Get music onto disk from any agent, or from a shell: name songs and albums, or hand over a playlist; flacli
 canonicalises the tracks on MusicBrainz, skips what your library already holds, fetches the rest on Soulseek
 through your own running Nicotine+ client (one identity, your shares intact), files every track as

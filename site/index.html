@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flacli · music onto disk, from any agent or a shell</title>
+<meta name="description" content="A command line and two MCP servers that get music onto disk: name songs and albums or hand over a playlist, canonicalised on MusicBrainz, diffed against your library, the rest fetched from Soulseek through your own Nicotine+. Works with any agent that can run a command, including small local models. Nothing is downloaded or deleted without your yes.">
+<link rel="canonical" href="https://flacli.vercel.app/">
+<link rel="alternate" type="text/plain" href="https://flacli.vercel.app/llms.txt" title="llms.txt">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="flacli">
+<meta property="og:url" content="https://flacli.vercel.app/">
+<meta property="og:title" content="flacli · music onto disk, from any agent or a shell">
+<meta property="og:description" content="Playlists · MusicBrainz · Soulseek · your own Nicotine+ · a tidy library. A CLI for any agent, an MCP server for small models, another for large ones. Everything runs locally.">
+<meta property="og:image" content="https://flacli.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The flacli page: masthead, headline, the commands from get to tidy.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="flacli · music onto disk, from any agent or a shell">
+<meta name="twitter:description" content="Playlists · MusicBrainz · Soulseek · your own Nicotine+ · a tidy library. A CLI for any agent. Everything runs locally.">
+<meta name="twitter:image" content="https://flacli.vercel.app/og.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "flacli",
+  "url": "https://flacli.vercel.app/",
+  "description": "A command line and two MCP servers: name songs and albums or import a playlist from TIDAL, Deezer, YouTube Music or an export file, canonicalise it against MusicBrainz, find what the local library already has, fetch the rest from Soulseek through the user's own Nicotine+ client with their approval, write an M3U, then tidy the library. Model-agnostic: any agent with a shell can drive it.",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Command-line tool and MCP server",
+  "operatingSystem": "Linux",
+  "softwareVersion": "0.1.0",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "isAccessibleForFree": true,
+  "codeRepository": "https://github.com/h-3303/flacli",
+  "installUrl": "https://github.com/h-3303/flacli#install",
+  "softwareRequirements": "Nicotine+ 3.3 or newer, uv",
+  "keywords": "cli, mcp, mcp-server, agents, local-llm, soulseek, nicotine-plus, musicbrainz, playlists, spotify, flac, music-library",
+  "author": { "@type": "Person", "name": "h-3303", "url": "https://github.com/h-3303" }
+}
+</script>
+<link rel="stylesheet" href="dtw.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141412'/%3E%3Ctext x='16' y='24' text-anchor='middle' font-family='serif' font-weight='700' font-size='22' fill='%23e8e5dc'%3Ef%3C/text%3E%3C/svg%3E">
+<style>
+  /* Page furniture only: the system's tokens and classes do the rest. */
+  html { background: var(--dtw-paper-2nd); }
+  body { margin: 0; padding: 28px 16px 56px; color: var(--dtw-toner); }
+  .page { max-width: 720px; margin: 0 auto; }
+  .sheet { padding: 30px 28px 34px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .pre { white-space: pre; overflow-x: auto; margin: 0; font-size: 12px; line-height: 1.55; }
+  a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  .dtw-sheet--black a { color: var(--dtw-paper); }
+  .stack > * + * { margin-top: 22px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 22px; align-items: start; }
+  .black-band { padding: 26px 24px 30px; margin: 30px -28px -34px; }
+  .steps .dtw-x-list__item { font-size: 12.5px; }
+  .steps b { font-weight: 700; letter-spacing: 0.03em; }
+  .tools { font: 400 12px/1.5 var(--dtw-font-typewriter); margin: 0; padding: 0; list-style: none; }
+  .tools li { display: grid; grid-template-columns: 170px 1fr; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--dtw-grey-2); }
+  .tools code { font: inherit; }
+  .doors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .door { border: 1px solid var(--dtw-toner); padding: 12px 12px 14px; background: var(--dtw-paper); }
+  .door__name { font: 400 11px/1.3 var(--dtw-font-typewriter); letter-spacing: 0.14em; text-transform: uppercase; }
+  .door__cmd { font: 400 12px/1.4 var(--dtw-font-typewriter); margin: 8px 0 6px; }
+  .door__for { font-size: 12px; line-height: 1.45; margin: 0; }
+  .rot-1 { transform: rotate(-0.8deg); } .rot-2 { transform: rotate(0.6deg); } .rot-3 { transform: rotate(-1.2deg); } .rot-4 { transform: rotate(1.1deg); }
+  @media (max-width: 640px) {
+    .sheet { padding: 22px 16px 26px; }
+    .two, .doors { grid-template-columns: 1fr; }
+    .black-band { margin: 26px -16px -26px; padding: 22px 16px 26px; }
+    .dtw-masthead__title { font-size: 34px !important; }
+    .tools li { grid-template-columns: 1fr; gap: 2px; }
+    .dtw-plate__spine { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+<div class="dtw-sheet dtw-sheet--paper dtw-xerox sheet">
+
+  <div class="row">
+    <div class="dtw-masthead dtw-masthead--bar" style="transform: rotate(-0.6deg)">
+      <div class="dtw-masthead__title">flacli</div>
+      <div class="dtw-masthead__tagline">PLAYLISTS · MUSICBRAINZ · SOULSEEK · ANY AGENT · A SHELL</div>
+    </div>
+    <span class="dtw-folio" style="transform: rotate(-4deg); margin-top: 6px">No. 2 · MMXXVI</span>
+  </div>
+
+  <div class="stack" style="margin-top: 26px">
+    <h1 class="dtw-headline" style="font-size: 26px; max-width: 600px">
+      MUSIC ONTO DISK. FROM WHATEVER MODEL YOU HAPPEN TO BE RUNNING.
+    </h1>
+
+    <p class="dtw-body" style="font-size: 13.5px; max-width: 600px">
+      <span class="dtw-body__dropcap">A</span> command line that takes the songs and albums you name, or a playlist from TIDAL, Deezer, YouTube
+      Music or an export file, works out which tracks you already own, canonicalises the rest against MusicBrainz,
+      and fetches what is missing from Soulseek through the Nicotine+ client already running on your machine. Every
+      command prints one JSON object and returns in seconds; the slow part runs in the background and
+      <code>flacli status</code> says what to do next. Any agent that can run a command can drive it, a seven-billion
+      parameter model included. Nothing is queued until you have seen the count, the size and the users involved and
+      said yes. No telemetry, no hosted service, no account but the ones you already have.
+    </p>
+
+    <div class="dtw-ornament dtw-ornament--diamond"><div class="dtw-ornament__line"></div><div class="dtw-ornament__diamond"></div><div class="dtw-ornament__line"></div></div>
+
+    <div>
+      <div class="dtw-bar-heading dtw-bar-heading--typewriter rot-1">THREE FRONT DOORS, ONE ENGINE</div>
+      <div class="doors" style="margin-top: 14px">
+        <div class="door" style="transform: rotate(-0.5deg)">
+          <div class="door__name">Shell</div>
+          <div class="door__cmd">flacli get "Lorde - Royals"</div>
+          <p class="door__for">Any agent with a shell tool. Small local models. Humans. The guide is one command away.</p>
+        </div>
+        <div class="door" style="transform: rotate(0.4deg)">
+          <div class="door__name">Simple MCP</div>
+          <div class="door__cmd">flacli mcp</div>
+          <p class="door__for">Eleven coarse tools, one workflow step each. For MCP clients with a modest model.</p>
+        </div>
+        <div class="door" style="transform: rotate(-0.3deg)">
+          <div class="door__name">Full MCP</div>
+          <div class="door__cmd">flacli mcp --full</div>
+          <p class="door__for">Every fine-grained tool, forty-three of them. For models that can plan a nine-step pipeline.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div>
+        <div class="dtw-bar-heading dtw-bar-heading--typewriter rot-2">HOW IT RUNS</div>
+        <div class="dtw-x-list steps" style="margin-top: 14px">
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>GET.</b> <code>flacli get "Artist - Title" "Artist - Album (album)"</code>. Albums are expanded to their tracklist on MusicBrainz, what you own is skipped, the rest is matched and, at or above 0.85 confidence, queued. Naming the music is the yes.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>SYNC.</b> <code>flacli sync playlist.csv</code>, or a TIDAL, Deezer or YouTube Music link. Resolve, diff, match in a detached worker. Nothing downloaded.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>STATUS.</b> The job, the counts, the transfers, where the finished files went, and a <code>next</code> field naming the command to run.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>REVIEW.</b> The doubtful matches with the reason each scored as it did. <code>approve</code> and <code>skip</code> by track id.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>QUEUE.</b> Totals first. <code>--yes</code> only after the user has seen them. Then the transfers go to Nicotine+.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>M3U.</b> The playlist in its own order. Tracks still missing are listed, never dropped.</span></div>
+          <div class="dtw-x-list__item"><span class="dtw-x-list__x">X</span><span><b>TIDY.</b> Each finished download is filed as <code>Artist/Album/NN - Title</code> on arrival. <code>flacli tidy</code> plans the rest of the library; <code>--apply</code> after your yes.</span></div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="dtw-plate" style="height: 236px; transform: rotate(0.7deg)">
+          <div class="dtw-plate__fill dtw-hatch dtw-tone" style="background-color: var(--dtw-grey-2); opacity: 0.9"></div>
+          <div class="dtw-plate__label" style="font-size: 10px; background: var(--dtw-paper); inset: 14px; border: 1px solid var(--dtw-toner)">ANY AGENT
+│
+├─ shell ──────── flacli get · sync · status
+│                 JSON out, worker in the back
+│
+└─ MCP (stdio) ── flacli mcp  |  --full
+                      │
+                      ▼
+                MCP BRIDGE PLUGIN
+                inside Nicotine+</div>
+          <div class="dtw-plate__spine"><span>FIG. 1 — ONE ENGINE, THREE DOORS</span></div>
+        </div>
+
+        <div class="dtw-quote rot-2" style="max-width: 320px">
+          <div class="dtw-quote__text">A small model does not fail at finding a folder on Soulseek. It fails at choosing between forty-three tools and remembering to poll. So the tools became commands, the pipeline became a worker, and the next step became a field in the output.</div>
+          <div class="dtw-quote__attr">— WHY THIS IS A FORK OF CLAUDE-MUSIC</div>
+        </div>
+
+        <div class="dtw-stamp" style="transform: rotate(-3deg)">NO DOWNLOAD<br>WITHOUT YOUR YES</div>
+      </div>
+    </div>
+
+    <div class="dtw-pasted-box rot-3">
+      <div class="dtw-bar-heading dtw-bar-heading--typewriter" style="margin: -4px 0 10px">INSTALL</div>
+<pre class="dtw-typewriter pre">sudo pacman -S --needed nicotine+ uv      # or your distro's packages
+git clone https://github.com/h-3303/flacli ~/src/flacli
+cd ~/src/flacli && ./install.sh
+
+flacli doctor                              # is Nicotine+ reachable?
+flacli config set music_dir ~/Music
+flacli guide                               # hand this to the agent</pre>
+      <p class="dtw-typewriter dtw-typewriter--muted" style="font-size: 11px; margin-top: 10px">
+        The script copies the bridge into Nicotine+'s plugin folder and installs <code>flacli</code> with
+        <code>uv tool install</code>. Then tick <em>MCP Bridge</em> in Nicotine+ → Preferences → Plugins. Settings live
+        in <code>~/.config/flacli/config.toml</code>; environment variables override them, so an MCP client entry can
+        carry its own music folder. Any distro with Nicotine+ 3.3 or newer and uv works.
+      </p>
+    </div>
+
+    <div>
+      <div class="dtw-bar-heading dtw-bar-heading--serif rot-4">The commands, in the order you use them.</div>
+      <ul class="tools" style="margin-top: 14px">
+        <li><code>flacli get "A - T" ...</code><span>named songs and albums; resolved, diffed, matched, queued; the request is the go-ahead</span></li>
+        <li><code>flacli sync &lt;file|url|id&gt;</code><span>import, MusicBrainz, library diff, then a background match; <code>--yes</code> when the user asked for everything confident up front</span></li>
+        <li><code>flacli status [id]</code><span>every playlist, or one: job, counts, transfers; files finished tracks; says what is next</span></li>
+        <li><code>flacli review · approve · skip</code><span>candidates with confidence 0–1, quality, queue length and a <em>why</em> breakdown</span></li>
+        <li><code>flacli queue &lt;id&gt; [--yes]</code><span>totals without the flag; transfers only with it</span></li>
+        <li><code>flacli m3u &lt;id&gt;</code><span>the file, in order, and the list of what is still missing</span></li>
+        <li><code>flacli tidy [--apply]</code><span>the library put in order; a report and a plan first, writes only with the flag</span></li>
+        <li><code>flacli search · download · downloads</code><span>the bridge on its own: raw Soulseek search, a whole folder, the transfer list</span></li>
+        <li><code>flacli service · config · doctor</code><span>TIDAL and YouTube Music logins stored 0600 on your disk; settings; the health check that says what to fix</span></li>
+      </ul>
+    </div>
+
+    <div class="two">
+      <div>
+        <div class="dtw-bar-heading dtw-bar-heading--typewriter rot-2">THE GUIDE, FOR THE AGENT</div>
+        <p class="dtw-body" style="font-size: 13px; margin-top: 14px">
+          <code>flacli guide</code> prints about ninety lines: a quick reference, the two workflows, the rules, and how to
+          read the output. It is written for the smallest model that might plausibly follow it. Paste it into a system
+          prompt, an <code>AGENTS.md</code>, a <code>CLAUDE.md</code>, or hand the model a shell and tell it to run the
+          command first. The rules are few: never pass <code>--yes</code> without the user's yes in the same conversation,
+          never delete by hand, do not fight the Soulseek rate limit, prefer FLAC, do not echo tokens.
+        </p>
+        <p class="dtw-body" style="font-size: 13px; margin-top: 12px">
+          For MCP clients the repository has the configuration for Claude Code, Codex CLI, Gemini CLI, opencode, Goose,
+          Claude Desktop, and local models through Ollama or llama.cpp. Keep small models on the simple server; the
+          full one has too many near-identical tools for them to pick between.
+        </p>
+      </div>
+      <div class="stack">
+        <div class="dtw-pasted-box rot-1">
+          <div class="dtw-bar-heading dtw-bar-heading--typewriter" style="margin: -4px 0 10px">A SESSION</div>
+<pre class="dtw-typewriter pre">$ flacli get "Boards of Canada - Geogaddi (album)"
+{ "understood": [ { "album": "Geogaddi",
+    "release": "2002-02-18", "tracks": 23 } ],
+  "already_in_library": 0, "to_fetch": 23,
+  "job_id": 4, "note": "fetching 23 track(s)
+  in the background; run flacli status 1" }
+
+$ flacli status 1
+{ "job": { "status": "finished",
+    "queued": 23, "for_review": 0 },
+  "downloads": { "done": 23 },
+  "tidied": { "moved": 23, "moved_to":
+    [ "Boards of Canada/Geogaddi" ] },
+  "next": "all done: flacli m3u 1" }</pre>
+        </div>
+        <div class="dtw-torn-scrap dtw-torn-scrap--v2 dtw-xerox" style="transform: rotate(1.2deg); max-width: 300px">
+          <p class="dtw-typewriter" style="font-size: 11px">The worker is a detached process with its pid in the job row. A later call can tell a live job from a dead one, and <code>flacli cancel</code> sends it a signal instead of hoping.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dtw-sheet dtw-sheet--black black-band">
+    <div class="dtw-reversed-panel" style="padding: 0; max-width: 560px">
+      <h2 class="dtw-headline dtw-headline--on-black" style="font-size: 20px">WHAT IT WILL NOT DO.</h2>
+      <p class="dtw-body dtw-body--on-black" style="margin-top: 10px">
+        It will not queue a transfer before you have seen the totals and agreed, except when you named the music
+        yourself. It will not raise the search rate limit, or suggest it. It will not touch the Spotify API: their terms
+        forbid feeding platform data to a model, so the data export is the route. It will not delete a file the plan did
+        not list, nor write a tag without a backup of the old one. It will not send anything anywhere but MusicBrainz,
+        your own Nicotine+, and a streaming service you have connected yourself. It does not care which model is
+        driving.
+      </p>
+      <div class="dtw-reversed-panel__attr">— the agent guide, rules section</div>
+    </div>
+
+    <div class="row" style="margin-top: 26px; flex-wrap: wrap; align-items: center">
+      <div class="dtw-torn-scrap dtw-torn-scrap--v1 dtw-xerox" style="transform: rotate(-0.9deg); max-width: 300px">
+        <p class="dtw-typewriter" style="font-size: 11px">Tested against Nicotine+ 3.3.10, 3.3.11 and master. 156 tests: a headless Nicotine+ core in-process, fake Soulseek peers, all three MCP servers over stdio, the CLI end to end through a real detached worker, a synthetic library tidied, the service connectors on recorded fixtures. Nothing touches the network.</p>
+      </div>
+      <div class="dtw-pasted-slip dtw-pasted-slip--hand" style="transform: rotate(-1.6deg); font-size: 30px">everything stays on your machine</div>
+    </div>
+
+    <p class="dtw-typewriter dtw-typewriter--on-black dtw-typewriter--tracked dtw-typewriter--caps" style="font-size: 10px; margin-top: 30px; text-align: center">
+      <a href="https://github.com/h-3303/flacli">github.com/h-3303/flacli</a> · <a href="llms.txt">llms.txt</a> · a fork of <a href="https://claude-music-liard.vercel.app/">claude-music</a> · GPL-3.0-or-later
+    </p>
+  </div>
+
+</div>
+</main>
+</body>
+</html>

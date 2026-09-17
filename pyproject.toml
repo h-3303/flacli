@@ -12,6 +12,10 @@ dependencies = [
     "ytmusicapi>=1.8",
 ]
 
+[project.urls]
+Homepage = "https://flacli.vercel.app"
+Repository = "https://github.com/h-3303/flacli"
+
 [project.scripts]
 flacli = "flacli.cli:main"
 
