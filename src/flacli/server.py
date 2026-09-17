@@ -36,6 +36,7 @@ from .requester import expand, parse_items
 from .tidy import Tidy, TidyError
 from .troi_resolver import Troi, TroiError
 from . import avatar as _avatar
+from . import cover as _cover
 from . import wiki as _wiki
 from .wiki import WikiError
 
@@ -544,6 +545,14 @@ def _pictures() -> _avatar.PictureSources:
     return _avatar.PictureSources(_wiki_sources(), fetch_bytes=State.fetch_bytes)
 
 
+def _covers() -> _cover.CoverSources:
+    return _cover.CoverSources(_wiki_sources(), fetch_bytes=State.fetch_bytes)
+
+
+def _cover_targets():
+    return _cover.cover_targets(config.wiki_targets())
+
+
 @mcp.tool(annotations=WRITE_LOCAL)
 @tool_errors
 async def wiki_todo(include_all: bool = False) -> dict:
@@ -983,6 +992,65 @@ async def avatar_push(artist: str | None = None) -> dict:
     albums, artists = await asyncio.to_thread(_wiki.inventory, db(), config.music_dir())
     entries = [_wiki.find_entry(albums, artists, artist)] if artist else artists
     return await asyncio.to_thread(_avatar.push, config.music_dir(), entries, _wiki_targets())
+
+
+# Album covers #
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def cover_todo(include_all: bool = False) -> dict:
+    """Albums with no cover file beside their music (<album folder>/cover.jpg, what MPD's albumart and the player
+    show) or with tracks that carry no embedded picture. Runs an incremental scan first. Then cover_fill; give the
+    rest one with cover_set."""
+    await scan_library()
+    return await asyncio.to_thread(_cover.missing, db(), config.music_dir(), include_all)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def cover_fill(limit: int = 10, providers: str = "local,coverart,deezer,itunes", embed: bool = True) -> dict:
+    """Find a cover for every album without one, `limit` albums per call, from the first provider that has one: a
+    picture a tagger left in the album folder or embedded in a track, the Cover Art Archive front (the tagged
+    release, else the release group MusicBrainz finds), Deezer's public album search, the iTunes Search API
+    (exact artist and title match only; the edition suffix is dropped for a second try). The cover is saved beside
+    the music as cover.jpg, embedded in every track that has no picture (never replacing one; embed=False leaves
+    the tags alone), its origin kept in <music>/.wiki/covers.json, and written into the player's cache, clearing
+    its failed-lookup memo, so it shows at once. `not_found` albums need one from the user: cover_set. Call again
+    while `remaining` > 0. providers narrows or reorders the sources."""
+    await scan_library()
+    return await asyncio.to_thread(_cover.fill, db(), config.music_dir(), _covers(), _cover_targets(), limit, providers, embed)
+
+
+@mcp.tool(annotations=NETWORK)
+@tool_errors
+async def cover_set(artist: str, album: str, source: str, attribution: str | None = None, embed: bool = True) -> dict:
+    """Use one cover for an album: `source` is a local image file or an http(s) URL (jpg, png or webp, at least
+    300 px on the short edge). Saved beside the music as cover.jpg, replacing any previous cover file, embedded in
+    the tracks that have no picture, and pushed into the player. attribution names the photographer or site."""
+    await scan_library()
+    return await asyncio.to_thread(_cover.set_image, db(), config.music_dir(), artist, album, source, _covers(),
+                                   _cover_targets(), attribution, embed)
+
+
+@mcp.tool(annotations=WRITE_LOCAL)
+@tool_errors
+async def cover_push(artist: str | None = None, album: str | None = None) -> dict:
+    """Write the cover files beside the music into the players' caches again (one album, one artist's albums, or
+    every album with a cover file), e.g. after the player's cache was cleared or a cover was replaced by hand."""
+    await scan_library()
+    albums, artists = await asyncio.to_thread(_wiki.inventory, db(), config.music_dir())
+
+    if artist and album:
+        entries = [_wiki.find_entry(albums, artists, artist, album)]
+    elif artist:
+        entries = [a for a in albums if _wiki._fold(a["artist"]) == _wiki._fold(artist)]
+
+        if not entries:
+            raise LookupError(f"artist {artist!r} is not in the library index; check the spelling or run flacli scan")
+    else:
+        entries = albums
+
+    return await asyncio.to_thread(_cover.push, config.music_dir(), entries, _cover_targets())
 
 
 # Tidy #

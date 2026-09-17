@@ -340,6 +340,13 @@ def _renditions(picture: Path, settings: dict):
 
 def push_avatar(target: Path, name: str, picture: Path, settings: dict | None = None) -> str:
     """Write one artist's picture into a Flaclify/Euphonica cache as the player itself would. Returns what happened."""
+    return push_image(target, f"avatar:{name}", picture, settings)
+
+
+def push_image(target: Path, key: str, picture: Path, settings: dict | None = None) -> str:
+    """Write one picture under `key` (avatar:<name> for artists, <folder uri>/ for album covers) into a
+    Flaclify/Euphonica cache as the player itself would: a hires and a thumbnail WebP under <cache>/images/ and
+    two rows in the images table. Returns what happened."""
     if not target.is_file():
         return "no database (the player has not run yet)"
 
@@ -356,7 +363,6 @@ def push_avatar(target: Path, name: str, picture: Path, settings: dict | None = 
         images_dir = target.parent / "images"
         images_dir.mkdir(parents=True, exist_ok=True)
         hires, thumb = _renditions(picture, settings)
-        key = f"avatar:{name}"
         stamp = _now()
         replaced, memo = False, False
 

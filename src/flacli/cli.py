@@ -174,6 +174,25 @@ def build_parser() -> argparse.ArgumentParser:
     a = actions.add_parser("push", help="copy the pictures beside the music into the player caches again")
     a.add_argument("artist", nargs="?")
 
+    p = commands.add_parser("cover", help="album covers: beside the music as cover.jpg, in every track, pushed into the player")
+    actions = p.add_subparsers(dest="action", metavar="action")
+    actions.required = True
+    a = actions.add_parser("missing", help="albums without a cover file, or with tracks lacking a picture (scans first)")
+    a.add_argument("--all", action="store_true", help="every album, with cover state")
+    a = actions.add_parser("fill", help="find one per album: folder or embedded picture, Cover Art Archive, Deezer, iTunes")
+    a.add_argument("--limit", type=int, default=10, help="albums to look up per run (default 10)")
+    a.add_argument("--providers", help="comma-separated, in order (default local,coverart,deezer,itunes)")
+    a.add_argument("--no-embed", action="store_true", help="write the cover file only; leave the tracks' tags alone")
+    a = actions.add_parser("set", help="use one cover for an album, from a file or a URL")
+    a.add_argument("artist")
+    a.add_argument("album")
+    a.add_argument("source", help="image file path or http(s) URL")
+    a.add_argument("--attribution", help="photographer or site, when known")
+    a.add_argument("--no-embed", action="store_true", help="write the cover file only; leave the tracks' tags alone")
+    a = actions.add_parser("push", help="write the cover files into the player caches again")
+    a.add_argument("artist", nargs="?")
+    a.add_argument("album", nargs="?")
+
     p = commands.add_parser("service", help="streaming services: status, connect, disconnect, playlists")
     p.add_argument("action", choices=["status", "connect", "disconnect", "playlists"])
     p.add_argument("name", nargs="?", choices=["tidal", "deezer", "youtube-music"])
@@ -197,7 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=100)
 
     p = commands.add_parser("mcp", help="run an MCP server over stdio (default: the simple one for small models)")
-    p.add_argument("--full", action="store_true", help="every fine-grained tool (51); for capable models")
+    p.add_argument("--full", action="store_true", help="every fine-grained tool (55); for capable models")
     p.add_argument("--soulseek", action="store_true", help="only the raw Nicotine+ tools")
 
     return parser
@@ -301,6 +320,16 @@ async def dispatch(args) -> dict | str | None:
             return await simple.avatar_set(args.artist, args.source, attribution=args.attribution)
 
         return await simple.avatar_push(args.artist)
+    if command == "cover":
+        if args.action == "missing":
+            return await simple.cover_missing(include_all=args.all)
+        if args.action == "fill":
+            return await simple.cover_fill(limit=args.limit, providers=args.providers, embed=not args.no_embed)
+        if args.action == "set":
+            return await simple.cover_set(args.artist, args.album, args.source, attribution=args.attribution,
+                                          embed=not args.no_embed)
+
+        return await simple.cover_push(args.artist, args.album)
     if command == "service":
         headers_raw = None
 

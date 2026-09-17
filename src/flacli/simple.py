@@ -439,6 +439,23 @@ async def avatar_push(artist: str | None = None) -> dict:
     return await server.avatar_push(artist=artist)
 
 
+async def cover_missing(include_all: bool = False) -> dict:
+    """Albums without a cover file beside the music, or with tracks lacking a picture (after an incremental scan)."""
+    return await server.cover_todo(include_all=include_all)
+
+
+async def cover_fill(limit: int = 10, providers: str | None = None, embed: bool = True) -> dict:
+    return await server.cover_fill(limit=limit, embed=embed, **({"providers": providers} if providers else {}))
+
+
+async def cover_set(artist: str, album: str, source: str, attribution: str | None = None, embed: bool = True) -> dict:
+    return await server.cover_set(artist=artist, album=album, source=source, attribution=attribution, embed=embed)
+
+
+async def cover_push(artist: str | None = None, album: str | None = None) -> dict:
+    return await server.cover_push(artist=artist, album=album)
+
+
 async def wiki_push(artist: str | None = None, album: str | None = None) -> dict:
     """Copy sidecar texts into the player caches again (after a cache wipe, or a new target)."""
     await server.scan_library()
